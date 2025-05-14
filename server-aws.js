@@ -6,9 +6,7 @@ import compression from 'compression';
 import cors from 'cors';
 import multer from 'multer';
 import dotenv from 'dotenv';
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config();
-}
+dotenv.config({ override: false });
 import {
   S3Client,
   GetObjectCommand,
