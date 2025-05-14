@@ -22,9 +22,15 @@ const requiredEnvVars = [
   'AWS_SECRET_ACCESS_KEY',
   'SNS_TOPIC_ARN',
   'SNS_ROLE_ARN',
-  'S3_BUCKET_NAME',
-  'PORT',
+  'S3_BUCKET_NAME'
 ];
+
+console.log('ENV debug:', {
+  SNS_TOPIC_ARN: process.env.SNS_TOPIC_ARN,
+  SNS_ROLE_ARN: process.env.SNS_ROLE_ARN,
+  S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+});
+
 
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
@@ -48,7 +54,7 @@ import os from 'os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const port = process.env.PORT;
+const port = process.env.PORT || 3000;
 
 // AWS Configuration from environment variables
 const AWS_REGION = process.env.AWS_REGION;
