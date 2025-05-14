@@ -5,7 +5,10 @@ import express from 'express';
 import compression from 'compression';
 import cors from 'cors';
 import multer from 'multer';
-import dotenv from 'dotenv';
+if (process.env.NODE_ENV !== 'production') {
+  import dotenv from 'dotenv';
+  dotenv.config();
+}
 import {
   S3Client,
   GetObjectCommand,
@@ -13,7 +16,6 @@ import {
 } from '@aws-sdk/client-s3';
 
 // Load environment variables from .env file
-dotenv.config();
 
 // Validate required environment variables
 const requiredEnvVars = [
