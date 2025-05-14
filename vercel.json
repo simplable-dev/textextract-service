@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server-aws.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "*.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/process-pdf",
+      "dest": "server-aws.js"
+    },
+    {
+      "src": "/upload-pdf",
+      "dest": "server-aws.js"
+    },
+    {
+      "src": "/tables",
+      "dest": "server-aws.js"
+    },
+    {
+      "src": "/rectangle-extractor",
+      "dest": "server-aws.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "server-aws.js"
+    }
+  ]
+}

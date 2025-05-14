@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Table Image Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .image-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 3px solid #007bff;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .image-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .table-image {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .instructions {
+            background-color: #f0f8ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 5px solid #007bff;
+        }
+        .file-input {
+            margin: 20px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF Table Image Viewer</h1>
+        
+        <div class="instructions">
+            <h2>Instructions</h2>
+            <p>This tool allows you to view the table images extracted from your PDF. Use this to verify that the images are being correctly extracted.</p>
+            <ol>
+                <li>Select your PDF file using the file input below</li>
+                <li>Click "Extract Table Images" to process the PDF</li>
+                <li>The extracted table images will be displayed below</li>
+            </ol>
+        </div>
+        
+        <div class="file-input">
+            <input type="file" id="pdf-file" accept="application/pdf">
+            <button id="extract-btn">Extract Table Images</button>
+        </div>
+        
+        <div id="status"></div>
+        
+        <div id="images-container"></div>
+    </div>
+
+    <!-- Include PDF.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script>
+        // Set PDF.js worker path
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        
+        // Sample table data (coordinates would come from Textract in the real app)
+        const sampleTables = [
+            { page: 1, bbox: { left: 0.1, top: 0.2, width: 0.8, height: 0.3 } },
+            { page: 1, bbox: { left: 0.1, top: 0.6, width: 0.8, height: 0.2 } },
+            { page: 2, bbox: { left: 0.2, top: 0.3, width: 0.7, height: 0.4 } }
+        ];
+        
+        document.getElementById('extract-btn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('pdf-file');
+            const statusDiv = document.getElementById('status');
+            const imagesContainer = document.getElementById('images-container');
+            
+            // Clear previous results
+            imagesContainer.innerHTML = '';
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                statusDiv.innerHTML = '<p class="error">Please select a PDF file first</p>';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            if (file.type !== 'application/pdf') {
+                statusDiv.innerHTML = '<p class="error">Selected file is not a PDF</p>';
+                return;
+            }
+            
+            statusDiv.innerHTML = '<p>Loading PDF file...</p>';
+            
+            try {
+                // Read the file as ArrayBuffer
+                const arrayBuffer = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(file);
+                });
+                
+                // Load the PDF document
+                const loadingTask = pdfjsLib.getDocument(new Uint8Array(arrayBuffer));
+                const pdf = await loadingTask.promise;
+                
+                statusDiv.innerHTML = `<p class="success">PDF loaded successfully. Pages: ${pdf.numPages}</p>`;
+                
+                // Process each table (in a real app, these would come from Textract)
+                for (let i = 0; i < sampleTables.length; i++) {
+                    const table = sampleTables[i];
+                    
+                    statusDiv.innerHTML = `<p>Extracting table ${i+1} of ${sampleTables.length}...</p>`;
+                    
+                    // Get the page
+                    const pdfPage = await pdf.getPage(table.page);
+                    
+                    // Set a scale for better quality
+                    const scale = 2.0;
+                    const viewport = pdfPage.getViewport({ scale });
+                    
+                    // Create a canvas for the full page
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    const context = canvas.getContext('2d');
+                    
+                    // Render the page to the canvas
+                    await pdfPage.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+                    
+                    // Calculate the dimensions in pixels
+                    const pixelLeft = Math.floor(table.bbox.left * viewport.width);
+                    const pixelTop = Math.floor(table.bbox.top * viewport.height);
+                    const pixelWidth = Math.ceil(table.bbox.width * viewport.width);
+                    const pixelHeight = Math.ceil(table.bbox.height * viewport.height);
+                    
+                    // Create a canvas for the table portion
+                    const tableCanvas = document.createElement('canvas');
+                    tableCanvas.width = pixelWidth;
+                    tableCanvas.height = pixelHeight;
+                    const tableContext = tableCanvas.getContext('2d');
+                    
+                    // Draw the table portion
+                    tableContext.drawImage(
+                        canvas, 
+                        pixelLeft, pixelTop, pixelWidth, pixelHeight,
+                        0, 0, pixelWidth, pixelHeight
+                    );
+                    
+                    // Convert to image
+                    const imageUrl = tableCanvas.toDataURL('image/png');
+                    
+                    // Create image container
+                    const imageContainer = document.createElement('div');
+                    imageContainer.className = 'image-container';
+                    
+                    // Add title
+                    const title = document.createElement('div');
+                    title.className = 'image-title';
+                    title.textContent = `Table ${i+1} (Page ${table.page})`;
+                    imageContainer.appendChild(title);
+                    
+                    // Add image
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.className = 'table-image';
+                    img.alt = `Table ${i+1} from page ${table.page}`;
+                    imageContainer.appendChild(img);
+                    
+                    // Add download link
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = imageUrl;
+                    downloadLink.download = `table_${i+1}_page_${table.page}.png`;
+                    downloadLink.textContent = 'Download Image';
+                    downloadLink.style.display = 'block';
+                    downloadLink.style.marginTop = '10px';
+                    imageContainer.appendChild(downloadLink);
+                    
+                    // Add to container
+                    imagesContainer.appendChild(imageContainer);
+                }
+                
+                statusDiv.innerHTML = `<p class="success">Successfully extracted ${sampleTables.length} table images</p>`;
+                
+            } catch (error) {
+                console.error('Error processing PDF:', error);
+                statusDiv.innerHTML = `<p class="error">Error processing PDF: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Rectangle Text Extractor</title>
+    <!-- PDF.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <!-- RBush for spatial indexing -->
+    <script src="https://unpkg.com/rbush@3.0.1/rbush.min.js"></script>
+    <script>
+      // Ensure RBush is available globally
+      if (typeof rbush === 'undefined' && typeof RBush !== 'undefined') {
+        window.rbush = RBush;
+      }
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .header {
+        background-color: #f5f5f5;
+        padding: 10px 20px;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .main-container {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      .pdf-container {
+        flex: 1;
+        position: relative;
+        overflow: auto;
+        background-color: #525659;
+      }
+
+      .pdf-viewer {
+        position: relative;
+        margin: 20px auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .pdf-page-container {
+        margin-bottom: 20px;
+        background-color: white;
+        position: relative;
+      }
+
+      .canvas-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        cursor: crosshair;
+      }
+
+      .pdf-page-number {
+        position: absolute;
+        bottom: -20px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 12px;
+        color: white;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 2px 0;
+      }
+
+      .results-container {
+        width: 400px;
+        padding: 20px;
+        overflow-y: auto;
+        border-left: 1px solid #ddd;
+        background-color: #f9f9f9;
+      }
+
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        color: white;
+        display: none;
+      }
+
+      .spinner {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 2s linear infinite;
+        margin-bottom: 20px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .file-input-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .extracted-text {
+        background-color: white;
+        padding: 15px;
+        border-radius: 5px;
+        border: 1px solid #ddd;
+        margin-top: 20px;
+      }
+
+      .text-block {
+        margin-bottom: 10px;
+        padding: 5px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .controls {
+        margin-top: 20px;
+      }
+
+      button {
+        padding: 8px 15px;
+        margin-right: 10px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background-color: #45a049;
+      }
+
+      #timer {
+        margin-top: 10px;
+        font-size: 14px;
+      }
+
+      .text-block-info {
+        display: flex;
+        justify-content: flex-start;
+        gap: 10px;
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+
+      .text-block-content {
+        font-size: 14px;
+        line-height: 1.4;
+        padding: 5px;
+        background-color: #f9f9f9;
+        border-left: 3px solid #4caf50;
+      }
+
+      .text-block-type {
+        background-color: #e0e0e0;
+        padding: 2px 5px;
+        border-radius: 3px;
+        margin-right: 5px;
+        font-weight: bold;
+      }
+
+      .block-type-summary {
+        margin-bottom: 15px;
+        padding: 10px;
+        background-color: #f0f0f0;
+        border-radius: 4px;
+        border-left: 4px solid #3498db;
+      }
+
+      .table-container {
+        overflow-x: auto;
+        margin-bottom: 20px;
+      }
+
+      .extracted-table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 15px;
+        background-color: white;
+      }
+
+      .extracted-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        vertical-align: top;
+      }
+
+      .extracted-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+
+      .extracted-table tr:hover {
+        background-color: #f1f1f1;
+      }
+
+      .table-cell {
+        background-color: #e8f4fe;
+      }
+
+      .text-cell {
+        background-color: #f9f9f9;
+      }
+
+      .cell-content {
+        min-height: 20px;
+        word-break: break-word;
+      }
+
+      .cell-coverage {
+        font-size: 10px;
+        color: #666;
+        margin-top: 4px;
+        font-style: italic;
+      }
+
+      .block-details {
+        margin-top: 20px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 10px;
+      }
+
+      .block-details summary {
+        cursor: pointer;
+        font-weight: bold;
+        padding: 5px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+      }
+
+      .threshold-control {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #f5f5f5;
+        border-radius: 5px;
+        border-left: 4px solid #3498db;
+      }
+
+      .threshold-control label {
+        display: block;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+
+      .threshold-control input[type='range'] {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+
+      .threshold-help {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>PDF Rectangle Text Extractor</h1>
+      <div class="file-input-container">
+        <input type="file" id="pdf-file" accept="application/pdf" />
+        <button id="process-btn">Process PDF</button>
+        <button id="load-sample-btn">Load Sample PDF</button>
+      </div>
+    </div>
+
+    <div class="main-container">
+      <div class="pdf-container" id="pdf-container">
+        <div class="pdf-viewer" id="pdf-viewer"></div>
+      </div>
+
+      <div class="results-container">
+        <h2>Extracted Text</h2>
+        <p>Draw a rectangle on the PDF to extract text from that area.</p>
+
+        <div class="threshold-control">
+          <label for="coverage-threshold"
+            >Coverage Threshold: <span id="threshold-value">60%</span></label
+          >
+          <input
+            type="range"
+            id="coverage-threshold"
+            min="10"
+            max="100"
+            value="60"
+            step="5"
+          />
+          <p class="threshold-help">
+            Only cells with at least this much coverage by the selection
+            rectangle will be included.
+          </p>
+        </div>
+
+        <div id="extraction-results"></div>
+        <div class="controls">
+          <button id="clear-btn">Clear Selection</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="spinner"></div>
+      <div id="loading-message">Processing...</div>
+      <div id="timer">Elapsed time: 0s</div>
+    </div>
+
+    <script>
+      // Initialize PDF.js worker
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+      // Server endpoint for processing PDFs
+      const SERVER_ENDPOINT = '/process-pdf';
+      const UPLOAD_ENDPOINT = '/upload-pdf';
+
+      // DOM elements
+      const pdfContainer = document.getElementById('pdf-container');
+      const pdfViewer = document.getElementById('pdf-viewer');
+      const fileInput = document.getElementById('pdf-file');
+      const processBtn = document.getElementById('process-btn');
+      const clearBtn = document.getElementById('clear-btn');
+      const extractionResults = document.getElementById('extraction-results');
+      const loadingOverlay = document.getElementById('loading-overlay');
+      const loadingMessage = document.getElementById('loading-message');
+      const timerElement = document.getElementById('timer');
+      const loadSampleBtn = document.getElementById('load-sample-btn');
+
+      // State variables
+      let pdfDoc = null;
+      let currentScale = 1.5;
+      let isDrawing = false;
+      let startX = 0;
+      let startY = 0;
+      let lastMouseX = 0;
+      let lastMouseY = 0;
+      let canvasOverlay = null;
+      let ctx = null;
+      let textractData = null;
+      let spatialIndex = null;
+      let timerInterval = null;
+      let startTime = 0;
+
+      // Event listeners
+      fileInput.addEventListener('change', handleFileSelection);
+      processBtn.addEventListener('click', processPdf);
+      clearBtn.addEventListener('click', clearSelection);
+      loadSampleBtn.addEventListener('click', loadSamplePdf);
+
+      // Threshold slider event listener
+      const thresholdSlider = document.getElementById('coverage-threshold');
+      const thresholdValue = document.getElementById('threshold-value');
+
+      thresholdSlider.addEventListener('input', function () {
+        // Update the displayed value
+        const value = this.value;
+        thresholdValue.textContent = value + '%';
+
+        // Update the threshold value (convert percentage to decimal)
+        CELL_COVERAGE_THRESHOLD = value / 100;
+
+        // If we're currently drawing, update the preview
+        if (isDrawing && canvasOverlay && ctx) {
+          // Trigger a mousemove event to update the preview
+          const event = new MouseEvent('mousemove', {
+            clientX: lastMouseX,
+            clientY: lastMouseY,
+          });
+          handleMouseMove(event);
+        }
+      });
+
+      // Initialize the application
+      function init() {
+        // Set up event listeners for the canvas overlay
+        setupCanvasListeners();
+      }
+
+      // Set up canvas listeners
+      function setupCanvasListeners() {
+        pdfContainer.addEventListener('mousedown', startDrawing);
+        pdfContainer.addEventListener('mousemove', draw);
+        pdfContainer.addEventListener('mouseup', endDrawing);
+      }
+
+      // Handle file selection
+      function handleFileSelection() {
+        const file = fileInput.files[0];
+        if (file && file.type === 'application/pdf') {
+          processBtn.disabled = false;
+        } else {
+          processBtn.disabled = true;
+        }
+      }
+
+      // Load sample PDF
+      async function loadSamplePdf() {
+        showLoading('Loading sample PDF...');
+
+        try {
+          // Fetch the sample PDF
+          const response = await fetch('sample-text-ocr.pdf');
+          if (!response.ok) {
+            throw new Error('Failed to load sample PDF');
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+
+          // Load the PDF
+          await loadPdf(arrayBuffer);
+
+          // Enable the process button
+          processBtn.disabled = false;
+
+          hideLoading();
+
+          // Process the PDF to load the Textract data
+          await processPdf();
+        } catch (error) {
+          console.error('Error loading sample PDF:', error);
+          hideLoading();
+          alert('Error loading sample PDF: ' + error.message);
+        }
+      }
+
+      // Process the PDF
+      async function processPdf() {
+        const file = fileInput.files[0];
+        if (!file && !pdfDoc) {
+          alert('Please select a PDF file or load the sample PDF.');
+          return;
+        }
+
+        showLoading('Processing PDF...');
+
+        try {
+          if (!pdfDoc) {
+            // Read the file
+            const arrayBuffer = await readFileAsArrayBuffer(file);
+
+            // Load the PDF
+            await loadPdf(arrayBuffer);
+          }
+
+          // Upload the PDF to S3 and process with Textract
+          await processWithTextract(file);
+
+          hideLoading();
+        } catch (error) {
+          console.error('Error processing PDF:', error);
+          hideLoading();
+          alert('Error processing PDF: ' + error.message);
+        }
+      }
+
+      // Read file as ArrayBuffer
+      function readFileAsArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(file);
+        });
+      }
+
+      // Load PDF
+      async function loadPdf(arrayBuffer) {
+        try {
+          // Load the PDF document
+          const loadingTask = pdfjsLib.getDocument({
+            data: new Uint8Array(arrayBuffer),
+          });
+          pdfDoc = await loadingTask.promise;
+
+          // Render all pages
+          await renderAllPages();
+
+          return pdfDoc;
+        } catch (error) {
+          console.error('Error loading PDF:', error);
+          throw error;
+        }
+      }
+
+      // Render all PDF pages
+      async function renderAllPages() {
+        if (!pdfDoc) return;
+
+        try {
+          // Clear previous content
+          pdfViewer.innerHTML = '';
+
+          // Get the total number of pages
+          const numPages = pdfDoc.numPages;
+          console.log(`PDF has ${numPages} pages`);
+
+          // Render each page
+          for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+            await renderPage(pageNum);
+          }
+
+          // Clear any previous selection
+          clearSelection();
+        } catch (error) {
+          console.error('Error rendering PDF pages:', error);
+          throw error;
+        }
+      }
+
+      // Render PDF page
+      async function renderPage(pageNumber) {
+        if (!pdfDoc) return;
+
+        try {
+          // Get the page
+          const page = await pdfDoc.getPage(pageNumber);
+
+          // Calculate viewport
+          const viewport = page.getViewport({ scale: currentScale });
+
+          // Create a container for this page
+          const pageContainer = document.createElement('div');
+          pageContainer.className = 'pdf-page-container';
+          pageContainer.style.position = 'relative';
+          pageContainer.style.margin = '20px auto';
+          pageContainer.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
+          pageContainer.dataset.pageNumber = pageNumber;
+
+          // Create canvas for PDF rendering
+          const canvas = document.createElement('canvas');
+          canvas.className = 'pdf-canvas';
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          pageContainer.appendChild(canvas);
+
+          // Create overlay canvas for drawing
+          const pageOverlay = document.createElement('canvas');
+          pageOverlay.className = 'canvas-overlay';
+          pageOverlay.width = viewport.width;
+          pageOverlay.height = viewport.height;
+          pageOverlay.style.position = 'absolute';
+          pageOverlay.style.top = '0';
+          pageOverlay.style.left = '0';
+          pageOverlay.style.cursor = 'crosshair';
+          pageOverlay.dataset.pageNumber = pageNumber;
+          pageContainer.appendChild(pageOverlay);
+
+          // Add page number label
+          const pageNumberLabel = document.createElement('div');
+          pageNumberLabel.className = 'pdf-page-number';
+          pageNumberLabel.textContent = `Page ${pageNumber} of ${pdfDoc.numPages}`;
+          pageContainer.appendChild(pageNumberLabel);
+
+          // Add the page container to the viewer
+          pdfViewer.appendChild(pageContainer);
+
+          // Render PDF page
+          await page.render({
+            canvasContext: canvas.getContext('2d'),
+            viewport: viewport,
+          }).promise;
+
+          // Store the overlay canvas in a map for later use
+          if (!window.pageOverlays) {
+            window.pageOverlays = {};
+          }
+          window.pageOverlays[pageNumber] = pageOverlay;
+        } catch (error) {
+          console.error(`Error rendering PDF page ${pageNumber}:`, error);
+          throw error;
+        }
+      }
+
+      // Process with Textract
+      async function processWithTextract(file) {
+        showLoading('Processing with AWS Textract...');
+
+        try {
+          let s3Url;
+
+          if (file) {
+            // Upload the file to S3 first
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+
+            const uploadResponse = await fetch(UPLOAD_ENDPOINT, {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!uploadResponse.ok) {
+              const errorData = await uploadResponse.json();
+              throw new Error(errorData.error || 'Failed to upload PDF to S3');
+            }
+
+            const uploadResult = await uploadResponse.json();
+            s3Url = uploadResult.s3Url;
+            console.log('PDF uploaded to S3:', s3Url);
+          } else {
+            // For the sample PDF, we'll use the sample Textract data directly
+            // instead of trying to process it through AWS
+            try {
+              const textractResponse = await fetch(
+                'sample-text-ocr-debug.json'
+              );
+              if (textractResponse.ok) {
+                const data = await textractResponse.json();
+                textractData = { Blocks: data };
+                buildSpatialIndex(textractData.Blocks);
+                console.log('Loaded sample Textract data');
+                return textractData; // Return early, no need to call the server
+              } else {
+                throw new Error('Could not load sample Textract data');
+              }
+            } catch (e) {
+              console.warn('Could not load sample Textract data:', e);
+              alert(
+                'Error loading sample Textract data. Please upload a PDF file instead.'
+              );
+              throw e;
+            }
+          }
+
+          // Process the PDF with Textract
+          const response = await fetch(SERVER_ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ s3Url: s3Url }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(
+              errorData.error || 'Failed to process PDF with Textract'
+            );
+          }
+
+          textractData = await response.json();
+          console.log(
+            `Received ${
+              textractData.Blocks ? textractData.Blocks.length : 0
+            } blocks from Textract`
+          );
+
+          // Build spatial index
+          buildSpatialIndex(textractData.Blocks);
+
+          return textractData;
+        } catch (error) {
+          console.error('Error processing with Textract:', error);
+          throw error;
+        }
+      }
+
+      // Build spatial index from Textract data
+      function buildSpatialIndex(blocks) {
+        if (!blocks || blocks.length === 0) {
+          console.error('No blocks to index');
+          return;
+        }
+
+        // Handle different ways rbush might be exposed
+        const RBushConstructor = window.rbush || window.RBush;
+        if (!RBushConstructor) {
+          console.error(
+            'RBush library not found. Make sure it is properly loaded.'
+          );
+          alert(
+            'Error: RBush library not found. The spatial indexing functionality will not work.'
+          );
+          return;
+        }
+
+        const tree = new RBushConstructor();
+        const items = [];
+        const blockMap = {};
+
+        // First, create a map of all blocks by ID for easy lookup
+        blocks.forEach((block) => {
+          blockMap[block.Id] = block;
+        });
+
+        // Helper function to extract text from a block
+        function getTextFromBlock(block) {
+          // If the block has text, return it
+          if (block.Text) {
+            return block.Text;
+          }
+
+          // If the block has child relationships, get text from children
+          let text = '';
+          if (block.Relationships) {
+            for (const rel of block.Relationships) {
+              if (rel.Type === 'CHILD') {
+                for (const childId of rel.Ids) {
+                  const childBlock = blockMap[childId];
+                  if (childBlock && childBlock.Text) {
+                    text += childBlock.Text + ' ';
+                  }
+                }
+              }
+            }
+          }
+
+          return text.trim();
+        }
+
+        // First, identify all table blocks to help with cell identification
+        const tableBlocks = new Set();
+        blocks.forEach((block) => {
+          if (block.BlockType === 'TABLE' && block.Relationships) {
+            block.Relationships.forEach((rel) => {
+              if (rel.Type === 'CHILD') {
+                rel.Ids.forEach((id) => tableBlocks.add(id));
+              }
+            });
+          }
+        });
+
+        // Process all blocks with geometry
+        blocks.forEach((block) => {
+          if (block.Geometry && block.Geometry.BoundingBox && block.Page) {
+            // Include all text-containing blocks: LINE, WORD, SELECTION_ELEMENT, etc.
+            const bbox = block.Geometry.BoundingBox;
+            const text = getTextFromBlock(block);
+
+            // Determine if this is a cell or part of a table
+            let blockType = block.BlockType;
+            let isTableCell = false;
+
+            // Check if this is a cell
+            if (block.BlockType === 'CELL') {
+              isTableCell = true;
+            }
+            // Check if this is a child of a table
+            else if (tableBlocks.has(block.Id)) {
+              isTableCell = true;
+              blockType = 'CELL'; // Mark as cell for filtering purposes
+            }
+            // Check if this is a table title
+            else if (block.BlockType === 'TABLE_TITLE') {
+              isTableCell = true;
+            }
+
+            // Only include blocks that have text or are table-related
+            if (
+              text ||
+              isTableCell ||
+              block.BlockType === 'SELECTION_ELEMENT' ||
+              block.BlockType === 'TABLE' ||
+              block.BlockType === 'KEY_VALUE_SET'
+            ) {
+              items.push({
+                minX: bbox.Left,
+                minY: bbox.Top,
+                maxX: bbox.Left + bbox.Width,
+                maxY: bbox.Top + bbox.Height,
+                block: {
+                  id: block.Id,
+                  type: blockType,
+                  text: text,
+                  confidence: block.Confidence,
+                  page: block.Page,
+                  boundingBox: bbox,
+                  isTableCell: isTableCell,
+                  selected:
+                    block.BlockType === 'SELECTION_ELEMENT'
+                      ? block.SelectionStatus === 'SELECTED'
+                      : undefined,
+                },
+              });
+            }
+          }
+        });
+
+        tree.load(items);
+        spatialIndex = tree;
+        console.log('Spatial index built with', items.length, 'items');
+      }
+
+      // Set up canvas listeners
+      function setupCanvasListeners() {
+        // We now need to delegate events to the container
+        // since we have multiple canvases
+        pdfContainer.addEventListener('mousedown', handleMouseDown);
+        pdfContainer.addEventListener('mousemove', handleMouseMove);
+        pdfContainer.addEventListener('mouseup', handleMouseUp);
+      }
+
+      // Handle mouse down event
+      function handleMouseDown(e) {
+        // Find the canvas element that was clicked
+        const overlay = findOverlayFromEvent(e);
+        if (!overlay) return;
+
+        // Store the current overlay and get its context
+        canvasOverlay = overlay;
+        ctx = overlay.getContext('2d');
+
+        // Get the page number
+        const pageNumber = parseInt(overlay.dataset.pageNumber, 10);
+
+        // Calculate coordinates relative to the canvas
+        const rect = overlay.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
+        isDrawing = true;
+
+        // Clear previous rectangle
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+        // Clear all other overlays
+        clearAllOverlaysExcept(pageNumber);
+      }
+
+      // Handle mouse move event
+      function handleMouseMove(e) {
+        if (!canvasOverlay || !ctx) return;
+
+        // Track mouse position for threshold slider updates
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+
+        if (!isDrawing) return;
+
+        const rect = canvasOverlay.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+
+        // Clear canvas and draw new rectangle
+        ctx.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
+
+        // Calculate rectangle dimensions
+        const width = currentX - startX;
+        const height = currentY - startY;
+        const x = width > 0 ? startX : startX + width;
+        const y = height > 0 ? startY : startY + height;
+        const absWidth = Math.abs(width);
+        const absHeight = Math.abs(height);
+
+        // If we have processed data and a valid rectangle, highlight cells that would be selected
+        if (spatialIndex && absWidth > 5 && absHeight > 5) {
+          // Get the page number
+          const pageNumber = parseInt(canvasOverlay.dataset.pageNumber, 10);
+
+          // Preview which cells would be selected
+          highlightPotentialSelections(x, y, absWidth, absHeight, pageNumber);
+        }
+
+        // Draw the selection rectangle
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
+        ctx.fillStyle = 'rgba(0, 123, 255, 0.2)';
+        ctx.lineWidth = 2;
+
+        ctx.rect(x, y, absWidth, absHeight);
+
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // Highlight cells that would be selected based on coverage threshold
+      function highlightPotentialSelections(x, y, width, height, pageNumber) {
+        // Convert canvas coordinates to normalized PDF coordinates
+        const selectionRect = {
+          minX: x / canvasOverlay.width,
+          minY: y / canvasOverlay.height,
+          maxX: (x + width) / canvasOverlay.width,
+          maxY: (y + height) / canvasOverlay.height,
+        };
+
+        // Search for intersecting text blocks
+        let results = spatialIndex.search(selectionRect);
+
+        // Filter results by page number if provided
+        if (pageNumber) {
+          results = results.filter((item) => item.block.page === pageNumber);
+        }
+
+        // Filter to find cells that meet the coverage threshold
+        results.forEach((item) => {
+          // Check if it's a cell type we want
+          const isDesiredType =
+            item.block.isTableCell ||
+            item.block.type === 'CELL' ||
+            item.block.type === 'TABLE_TITLE';
+
+          if (!isDesiredType) return;
+
+          // Calculate intersection area
+          const cellRect = {
+            minX: item.minX,
+            minY: item.minY,
+            maxX: item.maxX,
+            maxY: item.maxY,
+          };
+
+          const intersectionArea = calculateIntersectionArea(
+            selectionRect,
+            cellRect
+          );
+          const cellArea = (item.maxX - item.minX) * (item.maxY - item.minY);
+
+          // Calculate coverage percentage
+          const coveragePercentage = intersectionArea / cellArea;
+
+          // Highlight cells that meet the threshold
+          if (coveragePercentage >= CELL_COVERAGE_THRESHOLD) {
+            // Draw a highlight around the cell
+            const cellX = cellRect.minX * canvasOverlay.width;
+            const cellY = cellRect.minY * canvasOverlay.height;
+            const cellWidth =
+              (cellRect.maxX - cellRect.minX) * canvasOverlay.width;
+            const cellHeight =
+              (cellRect.maxY - cellRect.minY) * canvasOverlay.height;
+
+            // Draw cell highlight
+            ctx.beginPath();
+            ctx.strokeStyle = getCoverageColor(coveragePercentage);
+            ctx.lineWidth = 2;
+            ctx.rect(cellX, cellY, cellWidth, cellHeight);
+            ctx.stroke();
+
+            // Add a small label showing coverage percentage
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.fillRect(cellX, cellY - 15, 40, 15);
+            ctx.fillStyle = '#000';
+            ctx.font = '10px Arial';
+            ctx.fillText(
+              Math.round(coveragePercentage * 100) + '%',
+              cellX + 5,
+              cellY - 5
+            );
+          }
+        });
+      }
+
+      // Handle mouse up event
+      function handleMouseUp(e) {
+        if (!isDrawing || !canvasOverlay || !ctx) return;
+        isDrawing = false;
+
+        const rect = canvasOverlay.getBoundingClientRect();
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
+
+        // Calculate rectangle dimensions
+        const width = endX - startX;
+        const height = endY - startY;
+        const x = width > 0 ? startX : startX + width;
+        const y = height > 0 ? startY : startY + height;
+        const absWidth = Math.abs(width);
+        const absHeight = Math.abs(height);
+
+        // Get the page number
+        const pageNumber = parseInt(canvasOverlay.dataset.pageNumber, 10);
+
+        // Only process if we have a valid rectangle
+        if (absWidth > 5 && absHeight > 5) {
+          extractTextFromRectangle(x, y, absWidth, absHeight, pageNumber);
+        }
+      }
+
+      // Find the overlay canvas from an event
+      function findOverlayFromEvent(e) {
+        // Check if the event target is a canvas overlay
+        if (e.target.classList.contains('canvas-overlay')) {
+          return e.target;
+        }
+        return null;
+      }
+
+      // Clear all overlays except the active one
+      function clearAllOverlaysExcept(activePageNumber) {
+        if (!window.pageOverlays) return;
+
+        Object.entries(window.pageOverlays).forEach(([pageNum, overlay]) => {
+          if (parseInt(pageNum, 10) !== activePageNumber) {
+            const ctx = overlay.getContext('2d');
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+          }
+        });
+      }
+
+      // Variable for cell coverage threshold (default 60%)
+      let CELL_COVERAGE_THRESHOLD = 0.6;
+
+      // Calculate the intersection area between two rectangles
+      function calculateIntersectionArea(rect1, rect2) {
+        // Calculate intersection boundaries
+        const xOverlap = Math.max(
+          0,
+          Math.min(rect1.maxX, rect2.maxX) - Math.max(rect1.minX, rect2.minX)
+        );
+
+        const yOverlap = Math.max(
+          0,
+          Math.min(rect1.maxY, rect2.maxY) - Math.max(rect1.minY, rect2.minY)
+        );
+
+        // Calculate area
+        return xOverlap * yOverlap;
+      }
+
+      // Extract text from the selected rectangle
+      function extractTextFromRectangle(x, y, width, height, pageNumber) {
+        if (!spatialIndex) {
+          alert('Please process the PDF with Textract first!');
+          return;
+        }
+
+        showLoading('Extracting text...');
+
+        // Convert canvas coordinates to normalized PDF coordinates
+        const selectionRect = {
+          minX: x / canvasOverlay.width,
+          minY: y / canvasOverlay.height,
+          maxX: (x + width) / canvasOverlay.width,
+          maxY: (y + height) / canvasOverlay.height,
+        };
+
+        // Search for intersecting text blocks
+        let results = spatialIndex.search(selectionRect);
+
+        // Filter results by page number if provided
+        if (pageNumber) {
+          results = results.filter((item) => item.block.page === pageNumber);
+        }
+
+        // Filter by cell type and coverage threshold
+        let cellResults = results.filter((item) => {
+          // Check if it's a cell type we want
+          const isDesiredType =
+            item.block.isTableCell ||
+            item.block.type === 'CELL' ||
+            item.block.type === 'TABLE_TITLE';
+
+          if (!isDesiredType) return false;
+
+          // Calculate intersection area
+          const cellRect = {
+            minX: item.minX,
+            minY: item.minY,
+            maxX: item.maxX,
+            maxY: item.maxY,
+          };
+
+          const intersectionArea = calculateIntersectionArea(
+            selectionRect,
+            cellRect
+          );
+          const cellArea = (item.maxX - item.minX) * (item.maxY - item.minY);
+
+          // Calculate coverage percentage
+          const coveragePercentage = intersectionArea / cellArea;
+
+          // Store coverage percentage for display purposes
+          item.block.coveragePercentage = coveragePercentage;
+
+          // Only include if coverage exceeds threshold
+          return coveragePercentage >= CELL_COVERAGE_THRESHOLD;
+        });
+
+        // If no cells found with sufficient coverage, check if there are TABLE blocks
+        if (cellResults.length === 0) {
+          const tableRelatedBlocks = results.filter(
+            (item) =>
+              item.block.type === 'TABLE' || item.block.type === 'TABLE_FOOTER'
+          );
+
+          if (tableRelatedBlocks.length > 0) {
+            cellResults = tableRelatedBlocks;
+          }
+        }
+
+        // If still no table-related blocks, use WORD blocks as a fallback
+        // but still apply the coverage threshold
+        if (cellResults.length === 0) {
+          cellResults = results.filter((item) => {
+            const isTextBlock =
+              item.block.type === 'WORD' || item.block.type === 'KEY_VALUE_SET';
+
+            if (!isTextBlock) return false;
+
+            // Calculate intersection area
+            const blockRect = {
+              minX: item.minX,
+              minY: item.minY,
+              maxX: item.maxX,
+              maxY: item.maxY,
+            };
+
+            const intersectionArea = calculateIntersectionArea(
+              selectionRect,
+              blockRect
+            );
+            const blockArea = (item.maxX - item.minX) * (item.maxY - item.minY);
+
+            // Calculate coverage percentage
+            const coveragePercentage = intersectionArea / blockArea;
+
+            // Store coverage percentage for display purposes
+            item.block.coveragePercentage = coveragePercentage;
+
+            // Only include if coverage exceeds threshold
+            return coveragePercentage >= CELL_COVERAGE_THRESHOLD;
+          });
+        }
+
+        // Sort results by position (top to bottom, left to right)
+        cellResults.sort((a, b) => {
+          if (
+            Math.abs(a.block.boundingBox.Top - b.block.boundingBox.Top) < 0.01
+          ) {
+            return a.block.boundingBox.Left - b.block.boundingBox.Left;
+          }
+          return a.block.boundingBox.Top - b.block.boundingBox.Top;
+        });
+
+        // Display results
+        displayExtractedText(cellResults, pageNumber);
+
+        hideLoading();
+      }
+
+      // Display extracted text
+      function displayExtractedText(results, pageNumber) {
+        if (results.length === 0) {
+          extractionResults.innerHTML =
+            '<p>No table cells found in the selected area.</p>';
+          return;
+        }
+
+        let html = '<div class="extracted-text">';
+        html += `<p><strong>${results.length} table cells found${
+          pageNumber ? ` on page ${pageNumber}` : ''
+        }:</strong></p>`;
+
+        // Group results by row (based on Y position)
+        const rowGroups = groupResultsByRow(results);
+
+        // Create a table to display the cells in a grid format
+        html += '<div class="table-container">';
+        html += '<table class="extracted-table">';
+
+        // For each row group
+        rowGroups.forEach((row) => {
+          html += '<tr>';
+
+          // For each cell in the row
+          row.forEach((item) => {
+            const block = item.block;
+            const cellClass = block.isTableCell ? 'table-cell' : 'text-cell';
+            const coveragePercent = block.coveragePercentage
+              ? Math.round(block.coveragePercentage * 100) + '%'
+              : 'N/A';
+
+            // Add a data attribute for coverage and style based on coverage
+            const coverageStyle = block.coveragePercentage
+              ? `style="border-left: 4px solid ${getCoverageColor(
+                  block.coveragePercentage
+                )};"`
+              : '';
+
+            html += `<td class="${cellClass}" ${coverageStyle} title="Coverage: ${coveragePercent}">
+                      <div class="cell-content">${block.text || '&nbsp;'}</div>
+                      <div class="cell-coverage">Coverage: ${coveragePercent}</div>
+                    </td>`;
+          });
+
+          html += '</tr>';
+        });
+
+        html += '</table>';
+        html += '</div>';
+
+        // Add a section for detailed block information (collapsed by default)
+        html += '<details class="block-details">';
+        html += '<summary>Show Block Details</summary>';
+
+        // Group results by block type for the details section
+        const blocksByType = {};
+        results.forEach((item) => {
+          const type = item.block.type || 'UNKNOWN';
+          if (!blocksByType[type]) {
+            blocksByType[type] = [];
+          }
+          blocksByType[type].push(item);
+        });
+
+        // Display summary by block type
+        html += '<div class="block-type-summary">';
+        for (const type in blocksByType) {
+          html += `<div><strong>${type}:</strong> ${blocksByType[type].length} blocks</div>`;
+        }
+        html += '</div>';
+
+        // Display all blocks with details
+        results.forEach((item) => {
+          const block = item.block;
+          const blockType = block.type || 'UNKNOWN';
+          const confidence = block.confidence
+            ? block.confidence.toFixed(2) + '%'
+            : 'N/A';
+
+          html += `<div class="text-block">
+                    <div class="text-block-content">${
+                      block.text || '(No text)'
+                    }</div>
+                    <div class="text-block-info">
+                        <span class="text-block-type">${blockType}</span>
+                        <span class="text-block-page">Page: ${block.page}</span>
+                        <span class="text-block-confidence">Confidence: ${confidence}</span>
+                    </div>
+                </div>`;
+        });
+
+        html += '</details>';
+        html += '</div>';
+        extractionResults.innerHTML = html;
+      }
+
+      // Get color based on coverage percentage
+      function getCoverageColor(coverage) {
+        // Color gradient from red (60%) to green (100%)
+        if (coverage >= 0.9) return '#4CAF50'; // Green for high coverage
+        if (coverage >= 0.8) return '#8BC34A'; // Light green
+        if (coverage >= 0.7) return '#CDDC39'; // Lime
+        if (coverage >= 0.6) return '#FFC107'; // Amber
+        return '#FF5722'; // Deep orange for minimum coverage
+      }
+
+      // Group results by row based on Y position
+      function groupResultsByRow(results) {
+        // If no results, return empty array
+        if (results.length === 0) return [];
+
+        // Sort by Y position (top to bottom)
+        const sortedByY = [...results].sort(
+          (a, b) => a.block.boundingBox.Top - b.block.boundingBox.Top
+        );
+
+        const rows = [];
+        let currentRow = [];
+        let currentRowY = sortedByY[0].block.boundingBox.Top;
+        const rowThreshold = 0.01; // Threshold for considering blocks in the same row
+
+        // Group blocks into rows
+        sortedByY.forEach((item) => {
+          const blockY = item.block.boundingBox.Top;
+
+          // If this block is significantly below the current row, start a new row
+          if (Math.abs(blockY - currentRowY) > rowThreshold) {
+            if (currentRow.length > 0) {
+              // Sort the current row by X position (left to right)
+              currentRow.sort(
+                (a, b) => a.block.boundingBox.Left - b.block.boundingBox.Left
+              );
+              rows.push(currentRow);
+            }
+            currentRow = [item];
+            currentRowY = blockY;
+          } else {
+            currentRow.push(item);
+          }
+        });
+
+        // Add the last row if it has items
+        if (currentRow.length > 0) {
+          // Sort the current row by X position (left to right)
+          currentRow.sort(
+            (a, b) => a.block.boundingBox.Left - b.block.boundingBox.Left
+          );
+          rows.push(currentRow);
+        }
+
+        return rows;
+      }
+
+      // Clear selection
+      function clearSelection() {
+        // Clear all overlay canvases
+        if (window.pageOverlays) {
+          Object.values(window.pageOverlays).forEach((overlay) => {
+            const ctx = overlay.getContext('2d');
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+          });
+        }
+
+        // Reset the current canvas and context
+        canvasOverlay = null;
+        ctx = null;
+
+        // Clear the results
+        extractionResults.innerHTML =
+          '<p>Draw a rectangle on the PDF to extract text from that area.</p>';
+      }
+
+      // Show loading overlay with message
+      function showLoading(message) {
+        loadingMessage.textContent = message || 'Processing...';
+        loadingOverlay.style.display = 'flex';
+
+        // Start timer
+        startTime = Date.now();
+        timerElement.textContent = 'Elapsed time: 0s';
+
+        timerInterval = setInterval(() => {
+          const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+          timerElement.textContent = `Elapsed time: ${elapsedSeconds}s`;
+        }, 1000);
+      }
+
+      // Hide loading overlay
+      function hideLoading() {
+        loadingOverlay.style.display = 'none';
+
+        // Stop timer
+        clearInterval(timerInterval);
+      }
+
+      // Initialize the application
+      init();
+    </script>
+  </body>
+</html>

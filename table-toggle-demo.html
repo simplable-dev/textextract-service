@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Table Toggle Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { 
+      font-family: "Times New Roman", Times, serif;
+      line-height: 1.4;
+      margin: 0;
+      padding: 40px;
+      color: #000;
+      background-color: #fff;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .document-title {
+      color: #000;
+      font-size: 24px;
+      margin-bottom: 16px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .pdf-upload {
+      background-color: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .pdf-upload p {
+      margin: 10px 0;
+    }
+    .pdf-upload input[type="file"] {
+      margin: 10px 0;
+    }
+    .pdf-status {
+      font-style: italic;
+      margin-top: 10px;
+    }
+    #load-pdf-btn {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 14px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    #load-pdf-btn:hover {
+      background-color: #0069d9;
+    }
+    .table-container {
+      margin: 24px 0 32px 0;
+      page-break-inside: avoid;
+    }
+    .table-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0;
+    }
+    .toggle-view-btn {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 12px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .toggle-view-btn:hover {
+      background-color: #45a049;
+    }
+    .toggle-view-btn:disabled {
+      background-color: #cccccc;
+      color: #666666;
+      cursor: not-allowed;
+    }
+    .view-status {
+      font-size: 12px;
+      color: #666;
+      font-style: italic;
+    }
+    .table-title {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .table-page {
+      color: #666;
+      font-size: 12px;
+      text-align: right;
+      margin-bottom: 4px;
+      font-style: italic;
+    }
+    .table-image-container {
+      width: 100%;
+      overflow: auto;
+      border: 1px solid #ddd;
+      margin-bottom: 15px;
+    }
+    .table-image {
+      max-width: 100%;
+      display: block;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0;
+      font-size: 14px;
+    }
+    th, td {
+      border: 0.5px solid #000;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background-color: #f2f2f2;
+      font-weight: bold;
+    }
+    th[scope="col"] {
+      background-color: #e6e6e6;
+      border-bottom: 1px solid #999;
+    }
+    th[scope="row"] {
+      background-color: #f5f5f5;
+      text-align: left;
+      font-weight: bold;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="document-title">Table Toggle Demo</h1>
+  
+  <div class="pdf-upload">
+    <p>To extract tables as images, upload the original PDF file:</p>
+    <input type="file" id="pdf-file-input" accept=".pdf" />
+    <button id="load-pdf-btn" onclick="loadPdfFile()">Load PDF</button>
+    <p class="pdf-status" id="pdf-status"></p>
+  </div>
+  
+  <div class="table-container" data-page="1" data-left="0.1" data-top="0.2" data-width="0.8" data-height="0.3">
+    <div class="table-page">Page 1</div>
+    <div class="table-title">Sample Table 1</div>
+    <div class="table-controls">
+      <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+      <span class="view-status">Showing: HTML Table</span>
+    </div>
+    <div class="table-image-container" style="display:none;">
+      <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+    </div>
+    <table>
+      <tr>
+        <th scope="col">Header 1</th>
+        <th scope="col">Header 2</th>
+        <th scope="col">Header 3</th>
+      </tr>
+      <tr>
+        <th scope="row">Row 1</th>
+        <td>Data 1</td>
+        <td>Data 2</td>
+      </tr>
+      <tr>
+        <th scope="row">Row 2</th>
+        <td>Data 3</td>
+        <td>Data 4</td>
+      </tr>
+    </table>
+  </div>
+  
+  <div class="table-container" data-page="2" data-left="0.15" data-top="0.25" data-width="0.7" data-height="0.4">
+    <div class="table-page">Page 2</div>
+    <div class="table-title">Sample Table 2</div>
+    <div class="table-controls">
+      <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+      <span class="view-status">Showing: HTML Table</span>
+    </div>
+    <div class="table-image-container" style="display:none;">
+      <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+    </div>
+    <table>
+      <tr>
+        <th scope="col">Product</th>
+        <th scope="col">Quantity</th>
+        <th scope="col">Price</th>
+      </tr>
+      <tr>
+        <th scope="row">Item A</th>
+        <td>5</td>
+        <td>$10.00</td>
+      </tr>
+      <tr>
+        <th scope="row">Item B</th>
+        <td>3</td>
+        <td>$15.00</td>
+      </tr>
+      <tr>
+        <th scope="row">Item C</th>
+        <td>2</td>
+        <td>$20.00</td>
+      </tr>
+    </table>
+  </div>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script>
+    // Set PDF.js worker path
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    
+    // Store the PDF data and loaded state
+    let pdfData = null;
+    let pdfLoaded = false;
+    
+    // Function to load the PDF file and extract all table images
+    async function loadPdfFile() {
+      const fileInput = document.getElementById('pdf-file-input');
+      const statusElement = document.getElementById('pdf-status');
+      
+      if (!fileInput.files || fileInput.files.length === 0) {
+        statusElement.textContent = 'Please select a PDF file first';
+        statusElement.style.color = 'red';
+        return;
+      }
+      
+      const file = fileInput.files[0];
+      if (file.type !== 'application/pdf') {
+        statusElement.textContent = 'Please select a valid PDF file';
+        statusElement.style.color = 'red';
+        return;
+      }
+      
+      statusElement.textContent = 'Loading PDF...';
+      statusElement.style.color = 'blue';
+      
+      try {
+        // Read the file as ArrayBuffer
+        const arrayBuffer = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(file);
+        });
+        
+        // Store the PDF data
+        pdfData = new Uint8Array(arrayBuffer);
+        
+        // Update status
+        statusElement.textContent = 'PDF loaded. Extracting table images...';
+        
+        // Get all table containers
+        const tableContainers = document.querySelectorAll('.table-container');
+        
+        // Process each table container
+        for (let i = 0; i < tableContainers.length; i++) {
+          const container = tableContainers[i];
+          statusElement.textContent = 'Extracting table ' + (i+1) + ' of ' + tableContainers.length + '...';
+          
+          // Extract the image for this table
+          await extractTableImage(container, false);
+          
+          // Update the button text and enable it
+          const button = container.querySelector('.toggle-view-btn');
+          button.textContent = 'Show Image View';
+          button.disabled = false;
+        }
+        
+        // Mark PDF as loaded
+        pdfLoaded = true;
+        
+        // Update status
+        statusElement.textContent = 'PDF loaded successfully! Extracted ' + tableContainers.length + ' table images.';
+        statusElement.style.color = 'green';
+      } catch (error) {
+        console.error('Error loading PDF:', error);
+        statusElement.textContent = 'Error loading PDF: ' + error.message;
+        statusElement.style.color = 'red';
+      }
+    }
+    
+    // Function to toggle between HTML table and image view
+    function toggleTableView(tableContainer) {
+      if (!pdfLoaded) {
+        alert('Please load a PDF file first');
+        return;
+      }
+      
+      const tableElement = tableContainer.querySelector('table');
+      const imageContainer = tableContainer.querySelector('.table-image-container');
+      const button = tableContainer.querySelector('.toggle-view-btn');
+      const statusText = tableContainer.querySelector('.view-status');
+      
+      if (tableElement.style.display !== 'none') {
+        // Switch to image view
+        tableElement.style.display = 'none';
+        imageContainer.style.display = 'block';
+        button.textContent = 'Show HTML Table';
+        statusText.textContent = 'Showing: Image View';
+      } else {
+        // Switch to HTML table view
+        tableElement.style.display = '';
+        imageContainer.style.display = 'none';
+        button.textContent = 'Show Image View';
+        statusText.textContent = 'Showing: HTML Table';
+      }
+    }
+    
+    // Function to extract table as image
+    async function extractTableImage(tableContainer, download = false) {
+      try {
+        // Get table coordinates from data attributes
+        const page = parseInt(tableContainer.getAttribute('data-page'));
+        const left = parseFloat(tableContainer.getAttribute('data-left'));
+        const top = parseFloat(tableContainer.getAttribute('data-top'));
+        const width = parseFloat(tableContainer.getAttribute('data-width'));
+        const height = parseFloat(tableContainer.getAttribute('data-height'));
+        
+        if (!page || isNaN(left) || isNaN(top) || isNaN(width) || isNaN(height)) {
+          alert('Missing coordinate data for this table');
+          return;
+        }
+        
+        // Check if PDF data is available
+        if (!pdfData) {
+          alert('Please load a PDF file first using the button at the top of the page');
+          return;
+        }
+        
+        // Get the button and image elements
+        const button = tableContainer.querySelector('.toggle-view-btn');
+        const imageElement = tableContainer.querySelector('.table-image');
+        
+        // Load the PDF
+        const loadingTask = pdfjsLib.getDocument(pdfData);
+        const pdf = await loadingTask.promise;
+        
+        // Get the specific page
+        const pdfPage = await pdf.getPage(page);
+        
+        // Get the viewport at a higher scale for better quality
+        const scale = 2.0;
+        const viewport = pdfPage.getViewport({ scale });
+        
+        // Calculate the dimensions in pixels
+        const pixelLeft = left * viewport.width;
+        const pixelTop = top * viewport.height;
+        const pixelWidth = width * viewport.width;
+        const pixelHeight = height * viewport.height;
+        
+        // Create a canvas element
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        
+        // Set canvas dimensions to match the table
+        canvas.width = pixelWidth;
+        canvas.height = pixelHeight;
+        
+        // Set up rendering parameters
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport,
+          transform: [1, 0, 0, 1, -pixelLeft, -pixelTop]
+        };
+        
+        // Render the page to the canvas
+        await pdfPage.render(renderContext).promise;
+        
+        // Convert canvas to image
+        const imageDataUrl = canvas.toDataURL('image/png');
+        
+        // Set the image source
+        imageElement.src = imageDataUrl;
+        
+        // If download is requested, trigger download
+        if (download) {
+          const link = document.createElement('a');
+          link.href = imageDataUrl;
+          link.download = 'table_page' + page + '_' + left.toFixed(2) + '_' + top.toFixed(2) + '.png';
+          link.click();
+        }
+        
+        return imageDataUrl;
+      } catch (error) {
+        console.error('Error extracting table:', error);
+        if (download) {
+          alert('Error extracting table: ' + error.message);
+        }
+        return null;
+      }
+    }
+  </script>
+</body>
+</html>

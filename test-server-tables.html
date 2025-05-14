@@ -1,0 +1,3186 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test AWS PDF Server - Tables View</title>
+    <!-- PDF.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script>
+      // Set PDF.js worker path
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    </script>
+
+    <!-- No external grid library needed for our custom implementation -->
+    <script>
+      // This script will handle our custom table selection
+      window.addEventListener('load', function () {
+        console.log('Page loaded, custom table selection will be initialized');
+      });
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        line-height: 1.6;
+      }
+
+      /* Main layout container */
+      .main-container {
+        display: flex;
+        width: 100%;
+        height: calc(100vh - 40px);
+        gap: 20px;
+      }
+
+      /* PDF viewer container */
+      .pdf-viewer-container {
+        flex: 1;
+        min-width: 40%;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .pdf-viewer-header {
+        padding: 10px;
+        background-color: #f5f5f5;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .pdf-viewer-content {
+        flex: 1;
+        overflow: auto;
+        background-color: #f0f0f0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      #pdf-canvas-container {
+        margin: 20px 0;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      }
+
+      .pdf-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .pdf-controls button {
+        padding: 5px 10px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .pdf-controls button:hover {
+        background-color: #e9ecef;
+      }
+
+      .pdf-controls span {
+        margin: 0 5px;
+      }
+
+      /* Tables container */
+      .tables-container-wrapper {
+        flex: 1;
+        min-width: 50%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .tables-container-content {
+        flex: 1;
+        overflow: auto;
+        padding-right: 10px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Make tables container take full height */
+      #tables-container {
+        flex: 1;
+        display: block;
+        overflow: auto;
+      }
+
+      /* Table container styling */
+      .table-container {
+        margin-bottom: 30px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      h1 {
+        color: #333;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input[type='text'] {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      button {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      #response-container {
+        margin-top: 20px;
+      }
+      #response-status {
+        padding: 10px;
+        background-color: #e7f3fe;
+        border-left: 5px solid #2196f3;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+      #response-stats {
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-left: 5px solid #4caf50;
+        margin-bottom: 10px;
+        line-height: 1.6;
+      }
+      #compression-info {
+        padding: 10px;
+        background-color: #e8f4fd;
+        border-left: 5px solid #007bff;
+        margin-bottom: 10px;
+        line-height: 1.6;
+        font-size: 0.9em;
+      }
+      #response {
+        padding: 15px;
+        border: 1px solid #ddd;
+        background-color: #f9f9f9;
+        min-height: 50px;
+        max-height: 500px;
+        overflow: auto;
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+        display: none; /* Hide the JSON view by default */
+      }
+
+      /* Table styles */
+      #tables-container {
+        margin-top: 20px;
+      }
+      .table-container {
+        margin: 24px 0 32px 0;
+        page-break-inside: avoid;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .table-title {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 8px;
+        text-align: center;
+        padding: 10px;
+        background-color: #4a6da7;
+        color: white;
+      }
+      .table-page {
+        color: #666;
+        font-size: 12px;
+        text-align: right;
+        margin-bottom: 4px;
+        font-style: italic;
+        padding: 5px 10px;
+        background-color: #f8f8f8;
+        border-bottom: 1px solid #ddd;
+      }
+      /* Table wrapper for horizontal scrolling */
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        margin-bottom: 10px;
+        border: 1px solid #eee;
+        border-radius: 4px;
+        position: relative;
+        /* Ensure smooth scrolling */
+        scroll-behavior: smooth;
+      }
+
+      /* Add a subtle indicator for horizontal scrolling */
+      .table-wrapper::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 5px;
+        background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.05));
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      /* Only show the indicator when the table is wider than its container */
+      .table-wrapper:hover::after {
+        opacity: 1;
+      }
+
+      /* Customize scrollbar for better visibility */
+      .table-wrapper::-webkit-scrollbar {
+        height: 8px;
+      }
+
+      .table-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+      }
+
+      .table-wrapper::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 4px;
+      }
+
+      .table-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #a1a1a1;
+      }
+
+      /* Basic table styling */
+      table.selectable-table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0;
+        font-size: 14px;
+        /* Ensure the table has a minimum width to trigger scrolling when needed */
+        min-width: 650px;
+        user-select: none; /* Prevent text selection when clicking cells */
+      }
+
+      /* Style for table headers */
+      table.selectable-table th {
+        background-color: #e6e6e6;
+        font-weight: bold;
+      }
+
+      th,
+      td {
+        border: 0.5px solid #000;
+        padding: 6px 8px;
+        text-align: left;
+        vertical-align: top;
+        cursor: cell; /* Show cell cursor */
+        transition: background-color 0.15s ease;
+      }
+
+      th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+      }
+
+      th[scope='col'] {
+        background-color: #e6e6e6;
+        border-bottom: 1px solid #999;
+      }
+
+      th[scope='row'] {
+        background-color: #f5f5f5;
+        text-align: left;
+        font-weight: bold;
+      }
+
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+
+      /* Custom cell selection styles */
+      td.selectable:hover,
+      th.selectable:hover {
+        background-color: rgba(0, 123, 255, 0.1);
+      }
+
+      td.selected,
+      th.selected {
+        background-color: rgba(0, 123, 255, 0.2) !important;
+        border: 1px solid #0056b3;
+        position: relative;
+        z-index: 1;
+      }
+
+      td.selected:hover,
+      th.selected:hover {
+        background-color: rgba(0, 123, 255, 0.3) !important;
+      }
+
+      td.selection-start,
+      th.selection-start {
+        border: 2px solid #0056b3;
+      }
+
+      /* Selection in progress indicator */
+      .selecting td,
+      .selecting th {
+        cursor: crosshair;
+      }
+
+      /* Grid toolbar */
+      .grid-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        padding: 8px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .grid-toolbar-title {
+        font-weight: bold;
+        font-size: 16px;
+      }
+
+      .grid-toolbar-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      /* Button styles */
+      .grid-btn {
+        padding: 6px 12px;
+        font-size: 14px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        color: white;
+        transition: background-color 0.2s, transform 0.1s;
+      }
+
+      .grid-btn:hover {
+        transform: translateY(-1px);
+      }
+
+      .grid-btn.primary {
+        background-color: #007bff;
+      }
+
+      .grid-btn.primary:hover {
+        background-color: #0069d9;
+      }
+
+      .grid-btn.success {
+        background-color: #28a745;
+      }
+
+      .grid-btn.success:hover {
+        background-color: #218838;
+      }
+
+      .grid-btn.info {
+        background-color: #17a2b8;
+      }
+
+      .grid-btn.info:hover {
+        background-color: #138496;
+      }
+
+      .grid-btn.warning {
+        background-color: #ffc107;
+        color: #212529;
+      }
+
+      .grid-btn.warning:hover {
+        background-color: #e0a800;
+      }
+
+      .grid-btn.danger {
+        background-color: #dc3545;
+      }
+
+      .grid-btn.danger:hover {
+        background-color: #c82333;
+      }
+
+      /* Grid status message */
+      .grid-status {
+        margin-top: 10px;
+        padding: 8px 12px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      /* Tooltip styles */
+      .tooltip {
+        position: relative;
+        display: inline-block;
+        cursor: help;
+        margin-left: 8px;
+      }
+
+      .tooltip .tooltip-text {
+        visibility: hidden;
+        width: 280px;
+        background-color: #333;
+        color: #fff;
+        text-align: left;
+        border-radius: 6px;
+        padding: 10px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -140px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 12px;
+        line-height: 1.4;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .tooltip .tooltip-text::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #333 transparent transparent transparent;
+      }
+
+      .tooltip:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      /* Loading overlay */
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.8);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      .spinner {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 2s linear infinite;
+        margin-bottom: 20px;
+      }
+      .loading-text {
+        font-size: 18px;
+        color: #333;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes flash {
+        0% {
+          background-color: transparent;
+        }
+        25% {
+          background-color: rgba(0, 123, 255, 0.2);
+        }
+        100% {
+          background-color: transparent;
+        }
+      }
+
+      .flash-animation {
+        animation: flash 0.5s;
+      }
+
+      /* Toggle button */
+      .view-toggle {
+        margin: 10px 0;
+        text-align: right;
+      }
+      .view-toggle button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .view-toggle button:hover {
+        background-color: #0069d9;
+      }
+
+      /* Status styles */
+      .status-processing {
+        background-color: #fff3cd !important;
+        border-left-color: #ffc107 !important;
+      }
+      .status-completed {
+        background-color: #d4edda !important;
+        border-left-color: #28a745 !important;
+      }
+      .status-error {
+        background-color: #f8d7da !important;
+        border-left-color: #dc3545 !important;
+      }
+
+      /* Table summary */
+      .table-summary {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+      }
+      .table-summary h2 {
+        margin-top: 0;
+        font-size: 18px;
+        color: #333;
+      }
+      .no-tables {
+        padding: 20px;
+        text-align: center;
+        color: #666;
+        font-style: italic;
+        background-color: #f9f9f9;
+        border: 1px dashed #ddd;
+        border-radius: 5px;
+        margin: 20px 0;
+      }
+
+      /* File upload styles */
+      .separator {
+        display: flex;
+        align-items: center;
+        margin: 20px 0;
+        color: #666;
+      }
+      .separator hr {
+        flex-grow: 1;
+        border: none;
+        border-top: 1px solid #ddd;
+        margin: 0 10px;
+      }
+      .file-upload-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 5px;
+      }
+      .file-info {
+        padding: 8px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        color: #666;
+      }
+      #upload-btn {
+        background-color: #6c757d;
+        cursor: not-allowed;
+      }
+      #upload-btn:not([disabled]) {
+        background-color: #4caf50;
+        cursor: pointer;
+      }
+      #upload-btn:not([disabled]):hover {
+        background-color: #45a049;
+      }
+
+      /* Table image styles */
+      .table-container {
+        position: relative;
+        margin-bottom: 30px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .table-image-container {
+        display: none;
+        width: 100%;
+        overflow: auto;
+        border: 3px solid #007bff;
+        background-color: #f9f9f9;
+        padding: 15px;
+        margin: 15px 0;
+        text-align: center;
+        position: relative;
+        z-index: 10;
+        min-height: 100px;
+      }
+      .table-image-container.visible {
+        display: block !important;
+      }
+      .table-image {
+        max-width: 100%;
+        display: inline-block;
+        border: 1px solid #ccc;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        margin: 0 auto;
+      }
+      .table-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background-color: #e9f7fe;
+        border: 2px solid #007bff;
+        border-radius: 6px;
+        margin: 10px 0;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      .toggle-image-btn {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+        font-weight: bold;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease;
+      }
+      .toggle-image-btn:hover {
+        background-color: #0069d9;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        transform: translateY(-1px);
+      }
+      .toggle-image-btn:disabled {
+        background-color: #cccccc;
+        color: #666666;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      .view-status {
+        font-size: 14px;
+        color: #666;
+        font-style: italic;
+        padding: 4px 8px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+      }
+
+      /* PDF processing styles */
+      .pdf-processing {
+        margin-top: 15px;
+        padding: 15px;
+        background-color: #e9f7fe;
+        border: 2px solid #b8d6f8;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      }
+      .pdf-processing p {
+        margin: 8px 0;
+        font-size: 15px;
+        color: #333;
+      }
+      #process-pdf-btn {
+        background-color: #0056b3;
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        font-weight: bold;
+        margin: 8px 0;
+        cursor: pointer;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
+      }
+      #process-pdf-btn:hover {
+        background-color: #004494;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        transform: translateY(-2px);
+      }
+      #process-pdf-btn:disabled {
+        background-color: #cccccc;
+        color: #666666;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+      }
+      .pdf-status {
+        display: inline-block;
+        margin-left: 12px;
+        padding: 6px 12px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+      }
+
+      /* PDF canvas container positioning */
+      #pdf-canvas-container {
+        position: relative;
+        display: inline-block;
+      }
+
+      /* Table highlight animation */
+      @keyframes pulse-highlight {
+        0% {
+          box-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
+        }
+        50% {
+          box-shadow: 0 0 15px rgba(255, 0, 0, 0.8);
+        }
+        100% {
+          box-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
+        }
+      }
+
+      .table-highlight {
+        animation: pulse-highlight 2s infinite;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .table-highlight:hover {
+        transform: scale(1.02);
+        background-color: rgba(255, 0, 0, 0.2);
+      }
+
+      /* Flash animation for table containers */
+      @keyframes flash-container {
+        0% {
+          background-color: transparent;
+        }
+        25% {
+          background-color: rgba(255, 0, 0, 0.1);
+        }
+        100% {
+          background-color: transparent;
+        }
+      }
+
+      .flash-animation {
+        animation: flash-container 1s;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Test AWS PDF Server - Tables View</h1>
+
+    <div class="form-group">
+      <label for="s3-url">S3 URL to PDF:</label>
+      <input
+        type="text"
+        id="s3-url"
+        placeholder="https://your-bucket.s3.amazonaws.com/your-file.pdf"
+      />
+    </div>
+
+    <div class="form-group">
+      <button id="get-btn">Send GET Request</button>
+      <button id="post-btn">Send POST Request</button>
+    </div>
+
+    <div class="separator">
+      <hr />
+      <span>OR</span>
+      <hr />
+    </div>
+
+    <div class="form-group">
+      <label for="pdf-file">Upload PDF File:</label>
+      <div class="file-upload-container">
+        <input type="file" id="pdf-file" accept="application/pdf" />
+        <div class="file-info" id="file-info">No file selected</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <button id="upload-btn" disabled>Upload and Process</button>
+    </div>
+
+    <div id="response-status"></div>
+    <div id="response-stats"></div>
+    <div id="compression-info"></div>
+
+    <!-- Main container for side-by-side layout -->
+    <div class="main-container">
+      <!-- PDF Viewer on the left -->
+      <div class="pdf-viewer-container">
+        <div class="pdf-viewer-header">
+          <h3>PDF Document</h3>
+        </div>
+        <div class="pdf-viewer-content">
+          <div id="pdf-canvas-container"></div>
+        </div>
+      </div>
+
+      <!-- Tables on the right -->
+      <div class="tables-container-wrapper">
+        <div class="view-toggle">
+          <button id="toggle-view-btn" onclick="toggleView()">
+            Show JSON View
+          </button>
+        </div>
+        <div class="tables-container-content">
+          <!-- Tables container -->
+          <div id="tables-container"></div>
+
+          <!-- JSON response (hidden by default) -->
+          <pre id="response"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none">
+      <div class="spinner"></div>
+      <div id="loading-text" class="loading-text">
+        Processing... This may take some time. (0:00)
+      </div>
+    </div>
+
+    <!-- Hidden container for PDF rendering (legacy) -->
+    <div id="pdf-container" style="display: none">
+      <canvas id="pdf-canvas"></canvas>
+    </div>
+
+    <script>
+      // Function to toggle between tables and JSON view
+      function toggleView() {
+        const tablesContainer = document.getElementById('tables-container');
+        const responseElement = document.getElementById('response');
+        const toggleButton = document.getElementById('toggle-view-btn');
+
+        if (responseElement.style.display === 'none') {
+          // Switch to JSON view
+          tablesContainer.style.display = 'none';
+          responseElement.style.display = 'block';
+          toggleButton.textContent = 'Show Tables View';
+        } else {
+          // Switch to tables view
+          tablesContainer.style.display = 'block';
+          responseElement.style.display = 'none';
+          toggleButton.textContent = 'Show JSON View';
+        }
+      }
+
+      // Helper function to extract text from blocks
+      function getText(block, blockMap) {
+        // If the block directly has text, use it
+        if (block.Text) {
+          return block.Text;
+        }
+
+        let text = '';
+        if (!block.Relationships) return text;
+
+        for (const rel of block.Relationships) {
+          if (rel.Type !== 'CHILD') continue;
+          for (const id of rel.Ids) {
+            const child = blockMap[id];
+            if (!child) continue;
+
+            if (child.BlockType === 'WORD' && child.Text) {
+              text += child.Text + ' ';
+            } else if (child.BlockType === 'LINE' && child.Text) {
+              text += child.Text + ' ';
+            } else {
+              text += getText(child, blockMap) + ' ';
+            }
+          }
+        }
+        return text.trim();
+      }
+
+      // Global variables for PDF handling
+      let pdfFile = null;
+      let pdfDoc = null;
+      let pdfPages = {};
+      let currentPage = 1;
+      let zoomLevel = 1.0;
+
+      // Function to render all PDF pages
+      async function renderAllPdfPages() {
+        if (!pdfDoc) {
+          console.log('No PDF loaded');
+          return;
+        }
+
+        try {
+          // Clear the canvas container
+          const canvasContainer = document.getElementById(
+            'pdf-canvas-container'
+          );
+          canvasContainer.innerHTML = '';
+
+          // Create a container for all pages
+          const pagesContainer = document.createElement('div');
+          pagesContainer.className = 'pdf-pages-container';
+          pagesContainer.style.width = '100%';
+          canvasContainer.appendChild(pagesContainer);
+
+          // Add CSS for page containers
+          const style = document.createElement('style');
+          style.textContent = `
+            .pdf-page-container {
+              position: relative;
+              margin-bottom: 20px;
+              border-bottom: 1px solid #ccc;
+              padding-bottom: 20px;
+            }
+            .pdf-page-container.current-pdf-page {
+              border: 2px solid #0066ff;
+              box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+            }
+            .pdf-page-label {
+              position: absolute;
+              top: 10px;
+              left: 10px;
+              background: rgba(0, 0, 0, 0.5);
+              color: white;
+              padding: 5px 10px;
+              border-radius: 3px;
+              font-size: 12px;
+              z-index: 100;
+            }
+          `;
+          document.head.appendChild(style);
+
+          // Render each page
+          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            console.log(`Rendering PDF page ${pageNum} of ${pdfDoc.numPages}`);
+
+            // Create a container for this page
+            const pageContainer = document.createElement('div');
+            pageContainer.className = 'pdf-page-container';
+            pageContainer.setAttribute('data-page', pageNum);
+            pageContainer.id = `pdf-page-${pageNum}`;
+            pagesContainer.appendChild(pageContainer);
+
+            // Get the page from cache or load it
+            let pdfPage = pdfPages[pageNum];
+            if (!pdfPage) {
+              try {
+                pdfPage = await pdfDoc.getPage(pageNum);
+                pdfPages[pageNum] = pdfPage; // Cache the page
+              } catch (err) {
+                console.error(`Error loading page ${pageNum}:`, err);
+                continue;
+              }
+            }
+
+            // Create canvas for this page
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-canvas';
+            canvas.setAttribute('data-page', pageNum);
+            pageContainer.appendChild(canvas);
+
+            // Create overlay canvas for highlighting
+            const overlayCanvas = document.createElement('canvas');
+            overlayCanvas.className = 'pdf-overlay';
+            overlayCanvas.setAttribute('data-page', pageNum);
+            overlayCanvas.style.position = 'absolute';
+            overlayCanvas.style.top = '0';
+            overlayCanvas.style.left = '0';
+            overlayCanvas.style.pointerEvents = 'none';
+            pageContainer.appendChild(overlayCanvas);
+
+            // Calculate viewport with zoom
+            const viewport = pdfPage.getViewport({ scale: zoomLevel });
+
+            // Set canvas dimensions
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            overlayCanvas.width = viewport.width;
+            overlayCanvas.height = viewport.height;
+
+            // Render the page
+            const renderContext = {
+              canvasContext: canvas.getContext('2d'),
+              viewport: viewport,
+            };
+
+            await pdfPage.render(renderContext).promise;
+
+            // Add page number label
+            const pageLabel = document.createElement('div');
+            pageLabel.className = 'pdf-page-label';
+            pageLabel.textContent = `Page ${pageNum}`;
+            pageContainer.appendChild(pageLabel);
+
+            // Highlight tables on this page
+            highlightTablesOnPage(pageNum, canvas, pageContainer);
+          }
+
+          // Update current page (keep track of it for other functions)
+          currentPage = 1;
+
+          console.log('All PDF pages rendered successfully');
+        } catch (error) {
+          console.error('Error rendering PDF pages:', error);
+        }
+      }
+
+      // Function to render a single PDF page (keep for compatibility)
+      async function renderPdfPage(pageNum) {
+        if (!pdfDoc) {
+          console.log('No PDF loaded');
+          return;
+        }
+
+        // Update current page
+        currentPage = pageNum;
+
+        // Scroll to the page
+        const pageContainer = document.querySelector(`#pdf-page-${pageNum}`);
+        if (pageContainer) {
+          pageContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+          // Highlight the current page
+          document
+            .querySelectorAll('.pdf-page-container')
+            .forEach((container) => {
+              container.classList.remove('current-pdf-page');
+            });
+          pageContainer.classList.add('current-pdf-page');
+
+          // Update cell highlights
+          highlightSelectedCellsInPdf();
+        } else {
+          console.log(`Page container for page ${pageNum} not found`);
+        }
+      }
+
+      // Function to highlight tables on the current page
+      function highlightTablesOnPage(pageNum, targetCanvas, pageContainer) {
+        // Find all table containers with data-page attribute matching current page
+        const tableContainers = document.querySelectorAll(
+          `.table-container[data-page="${pageNum}"]`
+        );
+
+        if (tableContainers.length === 0) {
+          console.log(`No tables found for page ${pageNum}`);
+          return;
+        }
+
+        // Get the PDF canvas for this page
+        const canvas =
+          targetCanvas ||
+          document.querySelector(`#pdf-page-${pageNum} .pdf-canvas`);
+
+        if (!canvas) {
+          console.log(`Canvas not found for page ${pageNum}`);
+          return;
+        }
+
+        // Get canvas dimensions
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+
+        // Get the container for this page
+        const container =
+          pageContainer || document.querySelector(`#pdf-page-${pageNum}`);
+
+        if (!container) {
+          console.log(`Container not found for page ${pageNum}`);
+          return;
+        }
+
+        // Create overlay for highlights if it doesn't exist
+        let overlay = container.querySelector('.table-highlights');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.className = 'table-highlights';
+          overlay.style.position = 'absolute';
+          overlay.style.top = '0';
+          overlay.style.left = '0';
+          overlay.style.pointerEvents = 'none';
+          overlay.style.width = `${canvasWidth}px`;
+          overlay.style.height = `${canvasHeight}px`;
+          container.appendChild(overlay);
+        }
+
+        // Clear previous highlights
+        overlay.innerHTML = '';
+
+        console.log(
+          `Highlighting ${tableContainers.length} tables on page ${pageNum}`
+        );
+
+        // Add highlights for each table
+        tableContainers.forEach((tableContainer, index) => {
+          const left =
+            parseFloat(tableContainer.getAttribute('data-left')) * canvasWidth;
+          const top =
+            parseFloat(tableContainer.getAttribute('data-top')) * canvasHeight;
+          const width =
+            parseFloat(tableContainer.getAttribute('data-width')) * canvasWidth;
+          const height =
+            parseFloat(tableContainer.getAttribute('data-height')) *
+            canvasHeight;
+
+          const highlight = document.createElement('div');
+          highlight.className = 'table-highlight';
+          highlight.style.position = 'absolute';
+          highlight.style.left = `${left}px`;
+          highlight.style.top = `${top}px`;
+          highlight.style.width = `${width}px`;
+          highlight.style.height = `${height}px`;
+          highlight.style.border = '2px solid #ff0000';
+          highlight.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+          highlight.style.boxShadow = '0 0 10px rgba(255, 0, 0, 0.5)';
+          highlight.style.zIndex = '10';
+
+          // Add table number
+          const label = document.createElement('div');
+          label.className = 'table-label';
+          label.textContent = `Table ${index + 1}`;
+          label.style.position = 'absolute';
+          label.style.top = '-20px';
+          label.style.left = '0';
+          label.style.backgroundColor = '#ff0000';
+          label.style.color = 'white';
+          label.style.padding = '2px 5px';
+          label.style.borderRadius = '3px';
+          label.style.fontSize = '12px';
+          highlight.appendChild(label);
+
+          overlay.appendChild(highlight);
+
+          // Add click event to scroll to the corresponding table
+          highlight.addEventListener('click', () => {
+            tableContainer.scrollIntoView({ behavior: 'smooth' });
+            tableContainer.classList.add('flash-animation');
+            setTimeout(() => {
+              tableContainer.classList.remove('flash-animation');
+            }, 1000);
+          });
+        });
+      }
+
+      // Function to highlight selected cells in the PDF viewer
+      function highlightSelectedCellsInPdf() {
+        // Get all selected cells
+        const selectedCells = document.querySelectorAll('.selectable.selected');
+        console.log(`Total selected cells: ${selectedCells.length}`);
+
+        if (selectedCells.length === 0) {
+          clearAllPdfCellHighlights();
+          return;
+        }
+
+        // Group cells by page
+        const cellsByPage = {};
+        selectedCells.forEach((cell) => {
+          const cellPage = parseInt(cell.getAttribute('data-pdf-page'));
+          if (!isNaN(cellPage)) {
+            if (!cellsByPage[cellPage]) {
+              cellsByPage[cellPage] = [];
+            }
+            cellsByPage[cellPage].push(cell);
+          }
+        });
+
+        console.log(`Cells grouped by page:`, Object.keys(cellsByPage));
+
+        // If all cells are on a single page different from current, scroll to that page
+        const pageNumbers = Object.keys(cellsByPage).map(Number);
+        if (pageNumbers.length === 1 && pageNumbers[0] !== currentPage) {
+          const newPage = pageNumbers[0];
+          console.log(
+            `All selected cells are on page ${newPage}, scrolling to it`
+          );
+          renderPdfPage(newPage);
+        }
+
+        // Clear all highlights first
+        clearAllPdfCellHighlights();
+
+        // Highlight cells on each page
+        for (const pageNum in cellsByPage) {
+          highlightCellsOnPage(parseInt(pageNum), cellsByPage[pageNum]);
+        }
+      }
+
+      // Function to highlight cells on a specific page
+      function highlightCellsOnPage(pageNum, cells) {
+        if (!cells || cells.length === 0) return;
+
+        // Get the overlay canvas for this page
+        const overlayCanvas = document.querySelector(
+          `#pdf-page-${pageNum} .pdf-overlay`
+        );
+        if (!overlayCanvas) {
+          console.log(`Overlay canvas not found for page ${pageNum}`);
+          return;
+        }
+
+        // Get canvas context and dimensions
+        const ctx = overlayCanvas.getContext('2d');
+        const canvasWidth = overlayCanvas.width;
+        const canvasHeight = overlayCanvas.height;
+
+        // Clear previous highlights
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+        // Set highlight style
+        ctx.strokeStyle = '#0066ff';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(0, 102, 255, 0.2)';
+
+        // Draw highlights for each cell
+        cells.forEach((cell) => {
+          // Get PDF coordinates from data attributes
+          const left = parseFloat(cell.getAttribute('data-pdf-left') || 0);
+          const top = parseFloat(cell.getAttribute('data-pdf-top') || 0);
+          const width = parseFloat(cell.getAttribute('data-pdf-width') || 0);
+          const height = parseFloat(cell.getAttribute('data-pdf-height') || 0);
+
+          // Skip if any coordinate is missing or invalid
+          if (!left && !top && !width && !height) return;
+
+          // Convert normalized coordinates (0-1) to canvas pixels
+          const pixelLeft = left * canvasWidth;
+          const pixelTop = top * canvasHeight;
+          const pixelWidth = width * canvasWidth;
+          const pixelHeight = height * canvasHeight;
+
+          // Draw rectangle
+          ctx.beginPath();
+          ctx.rect(pixelLeft, pixelTop, pixelWidth, pixelHeight);
+          ctx.fill();
+          ctx.stroke();
+        });
+
+        console.log(`Highlighted ${cells.length} cells on PDF page ${pageNum}`);
+      }
+
+      // Function to clear all PDF cell highlights
+      function clearAllPdfCellHighlights() {
+        const overlayCanvases = document.querySelectorAll('.pdf-overlay');
+        overlayCanvases.forEach((canvas) => {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+      }
+
+      // Function to clear PDF cell highlights
+      function clearPdfCellHighlights() {
+        const overlayCanvas = document.querySelector(
+          '#pdf-canvas-container .pdf-overlay'
+        );
+        if (overlayCanvas) {
+          const ctx = overlayCanvas.getContext('2d');
+          ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        }
+      }
+
+      // Function to load PDF from file input
+      async function loadPdfFromInput() {
+        const fileInput = document.getElementById('pdf-file');
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+          console.log('No file selected');
+          return null;
+        }
+
+        const file = fileInput.files[0];
+        if (file.type !== 'application/pdf') {
+          console.log('Not a PDF file');
+          return null;
+        }
+
+        try {
+          // Store the file reference
+          pdfFile = file;
+
+          // Read the file as ArrayBuffer
+          const arrayBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+          });
+
+          // Convert to Uint8Array
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          // Load the PDF document
+          console.log('Loading PDF document...');
+          const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+          const pdf = await loadingTask.promise;
+
+          // Store the PDF document reference
+          pdfDoc = pdf;
+
+          console.log('PDF loaded successfully, pages:', pdf.numPages);
+          return pdf;
+        } catch (error) {
+          console.error('Error loading PDF:', error);
+          return null;
+        }
+      }
+
+      // Function to extract table image from PDF
+      async function extractTableImage(tableContainer, table) {
+        if (!pdfDoc || !pdfFile) {
+          console.log('PDF not loaded yet');
+          return null;
+        }
+
+        try {
+          // Get table coordinates from Textract data
+          if (!table.Geometry || !table.Geometry.BoundingBox || !table.Page) {
+            console.error('Missing geometry or page information for table');
+            return null;
+          }
+
+          const bbox = table.Geometry.BoundingBox;
+          const pageNum = table.Page;
+
+          console.log(`Extracting table from page ${pageNum}, bbox:`, bbox);
+
+          // Store coordinates as data attributes
+          tableContainer.setAttribute('data-page', pageNum);
+          tableContainer.setAttribute('data-left', bbox.Left.toFixed(4));
+          tableContainer.setAttribute('data-top', bbox.Top.toFixed(4));
+          tableContainer.setAttribute('data-width', bbox.Width.toFixed(4));
+          tableContainer.setAttribute('data-height', bbox.Height.toFixed(4));
+
+          // Get the page from cache or load it
+          let pdfPage = pdfPages[pageNum];
+          if (!pdfPage) {
+            try {
+              // Use the already loaded PDF document
+              pdfPage = await pdfDoc.getPage(pageNum);
+              pdfPages[pageNum] = pdfPage; // Cache the page
+              console.log(`Successfully loaded page ${pageNum}`);
+            } catch (err) {
+              console.error(`Error loading page ${pageNum}:`, err);
+              return null;
+            }
+          }
+
+          // First render the entire page to a temporary canvas
+          // This is a more reliable approach than trying to render just a portion
+          const scale = 2.0;
+          const viewport = pdfPage.getViewport({ scale });
+
+          console.log(`Page dimensions: ${viewport.width}x${viewport.height}`);
+
+          // Create a temporary canvas for the full page
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = viewport.width;
+          tempCanvas.height = viewport.height;
+          const tempContext = tempCanvas.getContext('2d');
+
+          // Render the full page
+          const renderContext = {
+            canvasContext: tempContext,
+            viewport: viewport,
+          };
+
+          console.log('Rendering full page to canvas...');
+          await pdfPage.render(renderContext).promise;
+          console.log('Page rendered successfully');
+
+          // Calculate the dimensions in pixels
+          const pixelLeft = Math.floor(bbox.Left * viewport.width);
+          const pixelTop = Math.floor(bbox.Top * viewport.height);
+          const pixelWidth = Math.ceil(bbox.Width * viewport.width);
+          const pixelHeight = Math.ceil(bbox.Height * viewport.height);
+
+          console.log(
+            `Table area: (${pixelLeft},${pixelTop}) ${pixelWidth}x${pixelHeight}`
+          );
+
+          // Create the final canvas for the table portion
+          const canvas = document.createElement('canvas');
+          canvas.width = pixelWidth;
+          canvas.height = pixelHeight;
+          const context = canvas.getContext('2d');
+
+          // Draw the table portion from the temporary canvas
+          try {
+            context.drawImage(
+              tempCanvas,
+              pixelLeft,
+              pixelTop,
+              pixelWidth,
+              pixelHeight,
+              0,
+              0,
+              pixelWidth,
+              pixelHeight
+            );
+            console.log('Table portion extracted successfully');
+          } catch (err) {
+            console.error('Error extracting table portion:', err);
+            // If extraction fails, use a fallback approach
+            context.fillStyle = '#f0f0f0';
+            context.fillRect(0, 0, pixelWidth, pixelHeight);
+            context.font = '14px Arial';
+            context.fillStyle = '#333';
+            context.textAlign = 'center';
+            context.fillText(
+              'Table image extraction failed',
+              pixelWidth / 2,
+              pixelHeight / 2
+            );
+          }
+
+          // Convert canvas to image
+          const imageDataUrl = canvas.toDataURL('image/png');
+
+          // Find the existing image container
+          const imageContainer = tableContainer.querySelector(
+            '.table-image-container'
+          );
+          if (!imageContainer) {
+            console.error('Image container not found in table container');
+            return null;
+          }
+
+          // Create and add the image element
+          const imageElement = document.createElement('img');
+          imageElement.className = 'table-image';
+          imageElement.src = imageDataUrl;
+          imageElement.alt = 'Table image from PDF';
+
+          // Add onload and onerror handlers to check if the image loaded correctly
+          imageElement.onload = function () {
+            console.log(
+              'Image loaded successfully, dimensions:',
+              this.naturalWidth,
+              'x',
+              this.naturalHeight
+            );
+
+            // If image has zero dimensions, replace with fallback
+            if (this.naturalWidth === 0 || this.naturalHeight === 0) {
+              createFallbackImage(imageContainer, pixelWidth, pixelHeight);
+            }
+          };
+
+          imageElement.onerror = function () {
+            console.error('Error loading image');
+            createFallbackImage(imageContainer, pixelWidth, pixelHeight);
+          };
+
+          // Clear any existing content and add the image
+          imageContainer.innerHTML = '';
+          imageContainer.appendChild(imageElement);
+
+          // Make sure the image container has the correct initial display style
+          // It should be hidden initially
+          imageContainer.style.display = 'none';
+
+          // We don't need to add debug elements anymore since we're using the image info div
+
+          // Log that the image was added to container
+          console.log('Image element added to container, ready for display');
+
+          // Function to create a fallback image if PDF rendering fails
+          function createFallbackImage(container, width, height) {
+            console.log('Creating fallback image');
+            const fallbackCanvas = document.createElement('canvas');
+            fallbackCanvas.width = width || 400;
+            fallbackCanvas.height = height || 200;
+            const ctx = fallbackCanvas.getContext('2d');
+
+            // Draw a nice looking fallback image
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, fallbackCanvas.width, fallbackCanvas.height);
+
+            // Add a border
+            ctx.strokeStyle = '#dee2e6';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+              2,
+              2,
+              fallbackCanvas.width - 4,
+              fallbackCanvas.height - 4
+            );
+
+            // Add text
+            ctx.font = 'bold 16px Arial';
+            ctx.fillStyle = '#495057';
+            ctx.textAlign = 'center';
+            ctx.fillText('Table Image', fallbackCanvas.width / 2, 40);
+
+            ctx.font = '14px Arial';
+            ctx.fillText(
+              'Image extraction from PDF failed',
+              fallbackCanvas.width / 2,
+              fallbackCanvas.height / 2
+            );
+            ctx.fillText(
+              'Showing HTML table representation instead',
+              fallbackCanvas.width / 2,
+              fallbackCanvas.height / 2 + 20
+            );
+
+            // Replace the image
+            const fallbackImage = document.createElement('img');
+            fallbackImage.className = 'table-image';
+            fallbackImage.src = fallbackCanvas.toDataURL('image/png');
+            fallbackImage.alt = 'Table representation (fallback)';
+
+            // Replace the content of the container
+            container.innerHTML = '';
+            container.appendChild(fallbackImage);
+          }
+
+          // Find the image info div
+          const imageInfoDiv =
+            tableContainer.querySelector('.table-image-info');
+          if (!imageInfoDiv) {
+            console.error('Image info div not found in table container');
+            return null;
+          }
+
+          // Show the image info div
+          imageInfoDiv.style.display = 'block';
+
+          // Clear existing content
+          imageInfoDiv.innerHTML = '';
+
+          // Create download link
+          const downloadLink = document.createElement('a');
+          downloadLink.href = imageDataUrl;
+          downloadLink.download = `table_page${pageNum}_${new Date().getTime()}.png`;
+          downloadLink.className = 'table-image-download';
+          downloadLink.textContent = 'Download Image';
+          downloadLink.style.display = 'inline-block';
+          downloadLink.style.color = '#28a745';
+          downloadLink.style.textDecoration = 'none';
+          downloadLink.style.fontWeight = 'bold';
+          downloadLink.style.padding = '5px 10px';
+          downloadLink.style.backgroundColor = '#f0f9f0';
+          downloadLink.style.border = '1px solid #c3e6cb';
+          downloadLink.style.borderRadius = '4px';
+
+          // Add download icon and link to info div
+          imageInfoDiv.appendChild(document.createTextNode('💾 '));
+          imageInfoDiv.appendChild(downloadLink);
+
+          // Add image dimensions
+          const dimensionsSpan = document.createElement('span');
+          dimensionsSpan.style.marginLeft = '15px';
+          dimensionsSpan.style.color = '#666';
+          dimensionsSpan.style.fontSize = '0.9em';
+
+          // Create a temporary image to get dimensions
+          const tempImg = new Image();
+          tempImg.onload = function () {
+            dimensionsSpan.textContent = `(${this.width}×${this.height}px)`;
+          };
+          tempImg.src = imageDataUrl;
+
+          imageInfoDiv.appendChild(dimensionsSpan);
+
+          return imageDataUrl;
+        } catch (error) {
+          console.error('Error extracting table image:', error);
+          return null;
+        }
+      }
+
+      // Function to create a table from Textract blocks using AG Grid
+      function createTableFromBlocks(table, blocks, blockMap, pageNum) {
+        // Find cells for this table
+        const cells = [];
+        if (table.Relationships) {
+          for (const rel of table.Relationships) {
+            if (rel.Type !== 'CHILD') continue;
+            for (const id of rel.Ids) {
+              const cell = blockMap[id];
+              if (cell && cell.BlockType === 'CELL') cells.push(cell);
+            }
+          }
+        }
+
+        // Skip empty tables
+        if (cells.length === 0) return null;
+
+        // Find max rows and columns
+        const maxRow = Math.max(...cells.map((c) => c.RowIndex || 0));
+        const maxCol = Math.max(...cells.map((c) => c.ColumnIndex || 0));
+
+        // Skip invalid tables
+        if (maxRow === 0 || maxCol === 0) return null;
+
+        // Find a title for this table
+        let tableTitle = '';
+        const tableTitles = blocks.filter(
+          (b) => b.Page === pageNum && b.BlockType === 'TABLE_TITLE'
+        );
+
+        if (tableTitles.length > 0 && table.Geometry) {
+          // Find the closest title above the table
+          const tableTop = table.Geometry.BoundingBox.Top;
+          const titlesAbove = tableTitles.filter(
+            (t) => t.Geometry && t.Geometry.BoundingBox.Top < tableTop
+          );
+
+          if (titlesAbove.length > 0) {
+            // Get the closest title
+            const closestTitle = titlesAbove.reduce((closest, current) => {
+              const closestDist = Math.abs(
+                closest.Geometry.BoundingBox.Top - tableTop
+              );
+              const currentDist = Math.abs(
+                current.Geometry.BoundingBox.Top - tableTop
+              );
+              return currentDist < closestDist ? current : closest;
+            });
+
+            tableTitle = closestTitle.Text || getText(closestTitle, blockMap);
+          }
+        }
+
+        // Create table container
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'table-container';
+
+        // Set page number as data attribute for visibility observer
+        tableContainer.setAttribute('data-page', pageNum);
+
+        // Store table coordinates for highlighting
+        if (table.Geometry && table.Geometry.BoundingBox) {
+          const bbox = table.Geometry.BoundingBox;
+          tableContainer.setAttribute('data-left', bbox.Left);
+          tableContainer.setAttribute('data-top', bbox.Top);
+          tableContainer.setAttribute('data-width', bbox.Width);
+          tableContainer.setAttribute('data-height', bbox.Height);
+        }
+
+        // Add page number
+        const pageElement = document.createElement('div');
+        pageElement.className = 'table-page';
+        pageElement.textContent = `Page ${pageNum}`;
+        tableContainer.appendChild(pageElement);
+
+        // Create toolbar with title and actions
+        const toolbar = document.createElement('div');
+        toolbar.className = 'grid-toolbar';
+
+        // Add title to toolbar
+        const toolbarTitle = document.createElement('div');
+        toolbarTitle.className = 'grid-toolbar-title';
+        toolbarTitle.textContent = tableTitle || `Table from Page ${pageNum}`;
+        toolbar.appendChild(toolbarTitle);
+
+        // Add action buttons
+        const toolbarActions = document.createElement('div');
+        toolbarActions.className = 'grid-toolbar-actions';
+
+        // Add copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'grid-btn success';
+        copyBtn.textContent = 'Copy Selected';
+        copyBtn.setAttribute('data-action', 'copy-selected');
+        toolbarActions.appendChild(copyBtn);
+
+        // Add help tooltip
+        const helpTooltip = document.createElement('span');
+        helpTooltip.className = 'tooltip';
+        helpTooltip.innerHTML =
+          '?<span class="tooltip-text"><strong>Excel-like Selection:</strong><br>• Click and drag to select cells<br>• Shift+Click to extend selection<br>• Ctrl/Cmd+Click for multiple selections<br>• Press Ctrl+C to copy selected cells</span>';
+        toolbarActions.appendChild(helpTooltip);
+
+        toolbar.appendChild(toolbarActions);
+        tableContainer.appendChild(toolbar);
+
+        // Add placeholder for image link - will be populated when PDF is processed
+        const imageInfoDiv = document.createElement('div');
+        imageInfoDiv.className = 'table-image-info';
+        imageInfoDiv.style.display = 'none';
+        imageInfoDiv.style.padding = '8px';
+        imageInfoDiv.style.marginTop = '10px';
+        imageInfoDiv.style.backgroundColor = '#f8f9fa';
+        imageInfoDiv.style.border = '1px solid #ddd';
+        imageInfoDiv.style.borderRadius = '4px';
+        tableContainer.appendChild(imageInfoDiv);
+
+        // Add placeholder for image container
+        const imageContainer = document.createElement('div');
+        imageContainer.className = 'table-image-container';
+        imageContainer.style.display = 'none';
+
+        // Add a placeholder message
+        const placeholderMsg = document.createElement('div');
+        placeholderMsg.style.padding = '20px';
+        placeholderMsg.style.color = '#666';
+        placeholderMsg.textContent =
+          'Image will be loaded when you click "Show Image View"';
+        imageContainer.appendChild(placeholderMsg);
+
+        tableContainer.appendChild(imageContainer);
+
+        // Create a wrapper for horizontal scrolling
+        const tableWrapper = document.createElement('div');
+        tableWrapper.className = 'table-wrapper';
+        tableContainer.appendChild(tableWrapper);
+
+        // Create table element with selectable cells
+        const tableElement = document.createElement('table');
+        tableElement.className = 'selectable-table';
+        tableElement.id = `table-${pageNum}-${Date.now()}`;
+        tableWrapper.appendChild(tableElement);
+
+        // Create grid status message container
+        const gridStatus = document.createElement('div');
+        gridStatus.className = 'grid-status';
+        gridStatus.style.display = 'none';
+        tableContainer.appendChild(gridStatus);
+
+        // Create HTML table with header row in thead
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+
+        for (let c = 1; c <= maxCol; c++) {
+          const headerCell = cells.find(
+            (cell) => cell.RowIndex === 1 && cell.ColumnIndex === c
+          );
+          const headerText = headerCell
+            ? headerCell.Text || getText(headerCell, blockMap)
+            : `Column ${c}`;
+
+          const th = document.createElement('th');
+          th.setAttribute('scope', 'col');
+          th.textContent = headerText;
+          headerRow.appendChild(th);
+        }
+
+        thead.appendChild(headerRow);
+        tableElement.appendChild(thead);
+
+        // Create tbody for data rows
+        const tbody = document.createElement('tbody');
+
+        // Create data rows
+        for (let r = 2; r <= maxRow; r++) {
+          const row = document.createElement('tr');
+
+          for (let c = 1; c <= maxCol; c++) {
+            const cell = cells.find(
+              (x) => x.RowIndex === r && x.ColumnIndex === c
+            );
+            const cellText = cell ? cell.Text || getText(cell, blockMap) : '';
+
+            // Create cell element
+            let cellElement;
+            if (c === 1 && cellText.trim()) {
+              // First column with content as row header
+              cellElement = document.createElement('th');
+              cellElement.setAttribute('scope', 'row');
+            } else {
+              // Regular cell
+              cellElement = document.createElement('td');
+            }
+
+            // Store original cell coordinates from Textract if available
+            if (cell) {
+              // Store normalized coordinates (0-1 scale)
+              if (cell.Geometry && cell.Geometry.BoundingBox) {
+                const bbox = cell.Geometry.BoundingBox;
+                cellElement.setAttribute('data-pdf-left', bbox.Left);
+                cellElement.setAttribute('data-pdf-top', bbox.Top);
+                cellElement.setAttribute('data-pdf-width', bbox.Width);
+                cellElement.setAttribute('data-pdf-height', bbox.Height);
+                cellElement.setAttribute('data-pdf-page', pageNum);
+              }
+
+              // Store cell ID for reference
+              if (cell.Id) {
+                cellElement.setAttribute('data-cell-id', cell.Id);
+              }
+            }
+
+            cellElement.textContent = cellText;
+            row.appendChild(cellElement);
+          }
+
+          tbody.appendChild(row);
+        }
+
+        // Append tbody to table
+        tableElement.appendChild(tbody);
+
+        // Add event listener to copy button
+        copyBtn.addEventListener('click', function () {
+          // The actual copy functionality is handled in setupCustomTableSelection
+          console.log(
+            'Copy button clicked, selection will be handled by setupCustomTableSelection'
+          );
+        });
+
+        // Store table element on the container for later access
+        tableContainer.tableElement = tableElement;
+
+        return tableContainer;
+      }
+
+      // Function to update grid selection status
+      function updateGridSelectionStatus(statusElement, gridApi) {
+        const ranges = gridApi.getCellRanges();
+
+        if (!ranges || ranges.length === 0) {
+          statusElement.style.display = 'none';
+          return;
+        }
+
+        statusElement.style.display = 'block';
+
+        // Count selected cells
+        let totalCells = 0;
+        ranges.forEach((range) => {
+          const startRow = range.startRow.rowIndex;
+          const endRow = range.endRow.rowIndex;
+          const startCol = range.columns[0].colId;
+          const endCol = range.columns[range.columns.length - 1].colId;
+
+          const rowCount = endRow - startRow + 1;
+          const colCount = range.columns.length;
+          totalCells += rowCount * colCount;
+        });
+
+        // Update status message
+        statusElement.innerHTML = `<strong>${totalCells} cell${
+          totalCells !== 1 ? 's' : ''
+        } selected</strong> in ${ranges.length} range${
+          ranges.length !== 1 ? 's' : ''
+        }. <span style="color: #666;">Use Ctrl+C to copy selected cells.</span>`;
+      }
+
+      // Function to process PDF and extract table images
+      async function processPdfForTables(tables, tableContainers) {
+        try {
+          // Load PDF from file input
+          const pdf = await loadPdfFromInput();
+
+          if (!pdf) {
+            console.log('No PDF loaded or invalid PDF');
+            return false;
+          }
+
+          // Update loading message
+          const loadingText = document.getElementById('loading-text');
+          loadingText.textContent = 'PDF loaded. Extracting table images...';
+
+          // Process each table container
+          for (let i = 0; i < tables.length; i++) {
+            if (i < tableContainers.length) {
+              const container = tableContainers[i];
+              const table = tables[i];
+
+              loadingText.textContent = `Extracting table ${i + 1} of ${
+                tables.length
+              }...`;
+
+              // Extract the image for this table
+              await extractTableImage(container, table);
+            }
+          }
+
+          return true;
+        } catch (error) {
+          console.error('Error processing PDF:', error);
+          return false;
+        }
+      }
+
+      // Custom function to set up table selection without AG Grid
+      function setupCustomTableSelection() {
+        // Find all tables with the selectable-table class
+        const tables = document.querySelectorAll('table.selectable-table');
+
+        tables.forEach((table) => {
+          let isSelecting = false;
+          let startCell = null;
+          let lastCell = null;
+          let selectedCells = new Set();
+
+          // Get the selection info element for this table
+          const tableContainer = table.closest('.table-container');
+          const selectionInfo = tableContainer
+            ? tableContainer.querySelector('.grid-status')
+            : null;
+
+          // Function to update selection info
+          function updateSelectionInfo() {
+            if (!selectionInfo) return;
+
+            if (selectedCells.size === 0) {
+              selectionInfo.style.display = 'none';
+              // Clear PDF highlights when no cells are selected
+              clearPdfCellHighlights();
+              return;
+            }
+
+            selectionInfo.style.display = 'block';
+            selectionInfo.innerHTML = `<strong>${selectedCells.size} cell${
+              selectedCells.size !== 1 ? 's' : ''
+            } selected</strong>`;
+
+            // Add selection content preview
+            if (selectedCells.size > 0) {
+              const cellContents = Array.from(selectedCells).map((cell) =>
+                cell.textContent.trim()
+              );
+              const displayContents = cellContents.slice(0, 3);
+
+              if (displayContents.length > 0) {
+                selectionInfo.innerHTML += `<br><span>Selected: "${displayContents.join(
+                  '", "'
+                )}"${
+                  cellContents.length > 3
+                    ? ` and ${cellContents.length - 3} more...`
+                    : ''
+                }</span>`;
+              }
+            }
+
+            // Update PDF cell highlights
+            highlightSelectedCellsInPdf();
+          }
+
+          // Function to clear selection
+          function clearSelection() {
+            selectedCells.forEach((cell) => {
+              cell.classList.remove('selected');
+              cell.classList.remove('selection-start');
+            });
+            selectedCells.clear();
+            startCell = null;
+            lastCell = null;
+            updateSelectionInfo();
+
+            // Clear PDF cell highlights
+            clearPdfCellHighlights();
+          }
+
+          // Function to select a range of cells
+          function selectRange(start, end) {
+            if (!start || !end) return;
+
+            try {
+              // Get start and end row/column indices
+              const startRow = parseInt(start.parentNode.rowIndex);
+              const startCol = start.cellIndex;
+              const endRow = parseInt(end.parentNode.rowIndex);
+              const endCol = end.cellIndex;
+
+              if (
+                isNaN(startRow) ||
+                isNaN(startCol) ||
+                isNaN(endRow) ||
+                isNaN(endCol)
+              ) {
+                console.error('Invalid cell indices:', {
+                  startRow,
+                  startCol,
+                  endRow,
+                  endCol,
+                });
+                return;
+              }
+
+              // Determine the range
+              const minRow = Math.min(startRow, endRow);
+              const maxRow = Math.max(startRow, endRow);
+              const minCol = Math.min(startCol, endCol);
+              const maxCol = Math.max(startCol, endCol);
+
+              // Select all cells in the range
+              const rows = table.rows;
+              for (let r = minRow; r <= maxRow; r++) {
+                if (r < rows.length) {
+                  const row = rows[r];
+                  for (let c = minCol; c <= maxCol; c++) {
+                    if (c < row.cells.length) {
+                      const cell = row.cells[c];
+                      cell.classList.add('selected');
+                      selectedCells.add(cell);
+                    }
+                  }
+                }
+              }
+
+              // Mark the start cell
+              start.classList.add('selection-start');
+
+              // Update selection info
+              updateSelectionInfo();
+
+              // Log selection for debugging
+              console.log(
+                `Selected range: (${minRow},${minCol}) to (${maxRow},${maxCol}), ${selectedCells.size} cells`
+              );
+            } catch (error) {
+              console.error('Error in selectRange:', error);
+            }
+          }
+
+          // Make all cells selectable
+          const cells = table.querySelectorAll('td, th');
+          cells.forEach((cell) => {
+            cell.classList.add('selectable');
+          });
+
+          // Variable to store auto-scroll interval
+          let autoScrollInterval = null;
+
+          // Function to check and perform auto-scrolling
+          function checkAutoScroll(e) {
+            if (!isSelecting) return;
+
+            const tableWrapper = table.closest('.table-wrapper');
+            if (!tableWrapper) return;
+
+            const wrapperRect = tableWrapper.getBoundingClientRect();
+            const scrollMargin = 60;
+            const scrollAmount = 15;
+
+            // Check if mouse is near right edge
+            if (e.clientX > wrapperRect.right - scrollMargin) {
+              tableWrapper.scrollLeft += scrollAmount;
+              return true;
+            }
+
+            // Check if mouse is near left edge
+            if (e.clientX < wrapperRect.left + scrollMargin) {
+              tableWrapper.scrollLeft -= scrollAmount;
+              return true;
+            }
+
+            return false;
+          }
+
+          // Mouse down event - start selection (attach to table for better performance)
+          table.addEventListener('mousedown', function (e) {
+            const cell = e.target.closest('.selectable');
+            if (!cell) return;
+
+            // Get the PDF page this cell belongs to and scroll to it
+            const cellPage = parseInt(cell.getAttribute('data-pdf-page'));
+            if (!isNaN(cellPage) && pdfDoc) {
+              console.log(
+                `Cell is from page ${cellPage}, scrolling to PDF page`
+              );
+
+              // Scroll to the corresponding PDF page
+              const pdfPageElement = document.querySelector(
+                `#pdf-page-${cellPage}`
+              );
+              if (pdfPageElement) {
+                // Scroll the PDF page into view with smooth animation
+                pdfPageElement.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                });
+
+                // Highlight the current page
+                document
+                  .querySelectorAll('.pdf-page-container')
+                  .forEach((container) => {
+                    container.classList.remove('current-pdf-page');
+                  });
+                pdfPageElement.classList.add('current-pdf-page');
+
+                // Update current page tracking
+                currentPage = cellPage;
+              } else {
+                console.log(`PDF page element #pdf-page-${cellPage} not found`);
+              }
+            }
+
+            // If Shift key is pressed, extend selection from last cell
+            if (e.shiftKey && lastCell) {
+              selectRange(lastCell, cell);
+              isSelecting = true;
+              table.classList.add('selecting');
+
+              // Start auto-scroll interval
+              if (autoScrollInterval) clearInterval(autoScrollInterval);
+              autoScrollInterval = setInterval(() => {
+                if (checkAutoScroll(e)) {
+                  // If we scrolled, update the selection
+                  const currentCell = document.elementFromPoint(
+                    e.clientX,
+                    e.clientY
+                  );
+                  if (
+                    currentCell &&
+                    currentCell.closest('.selectable') &&
+                    currentCell !== lastCell
+                  ) {
+                    selectRange(startCell, currentCell.closest('.selectable'));
+                    lastCell = currentCell.closest('.selectable');
+                  }
+                }
+              }, 50);
+
+              return;
+            }
+
+            // If Ctrl/Cmd key is not pressed, clear selection
+            if (!e.ctrlKey && !e.metaKey) {
+              clearSelection();
+            }
+
+            // Toggle selection for this cell
+            if (e.ctrlKey || e.metaKey) {
+              if (cell.classList.contains('selected')) {
+                cell.classList.remove('selected');
+                selectedCells.delete(cell);
+              } else {
+                cell.classList.add('selected');
+                selectedCells.add(cell);
+              }
+            } else {
+              cell.classList.add('selected');
+              selectedCells.add(cell);
+            }
+
+            startCell = cell;
+            lastCell = cell;
+            isSelecting = true;
+            table.classList.add('selecting');
+
+            // Mark as selection start
+            cell.classList.add('selection-start');
+
+            // Start auto-scroll interval
+            if (autoScrollInterval) clearInterval(autoScrollInterval);
+            autoScrollInterval = setInterval(() => {
+              if (checkAutoScroll(e)) {
+                // If we scrolled, update the selection
+                const currentCell = document.elementFromPoint(
+                  e.clientX,
+                  e.clientY
+                );
+                if (
+                  currentCell &&
+                  currentCell.closest('.selectable') &&
+                  currentCell !== lastCell
+                ) {
+                  selectRange(startCell, currentCell.closest('.selectable'));
+                  lastCell = currentCell.closest('.selectable');
+                }
+              }
+            }, 50);
+
+            updateSelectionInfo();
+
+            // Prevent text selection
+            e.preventDefault();
+          });
+
+          // Store current mouse position for auto-scrolling
+          let currentMouseX = 0;
+          let currentMouseY = 0;
+
+          // Mouse move event - update selection and track mouse position
+          table.addEventListener('mousemove', function (e) {
+            // Always update mouse position for auto-scrolling
+            currentMouseX = e.clientX;
+            currentMouseY = e.clientY;
+
+            if (!isSelecting || !startCell) return;
+
+            const cell = e.target.closest('.selectable');
+            if (!cell) return;
+
+            // If we moved to a new cell, update the selection
+            if (cell !== lastCell) {
+              // Clear previous selection if not in multi-select mode
+              if (!e.ctrlKey && !e.metaKey) {
+                selectedCells.forEach((c) => {
+                  if (c !== startCell) {
+                    c.classList.remove('selected');
+                    c.classList.remove('selection-start');
+                  }
+                });
+                selectedCells = new Set([startCell]);
+              }
+
+              selectRange(startCell, cell);
+              lastCell = cell;
+
+              // Update selection info
+              updateSelectionInfo();
+
+              // Update auto-scroll interval to use current mouse position
+              if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = setInterval(() => {
+                  // Create a synthetic event with current mouse position
+                  const syntheticEvent = {
+                    clientX: currentMouseX,
+                    clientY: currentMouseY,
+                  };
+
+                  if (checkAutoScroll(syntheticEvent)) {
+                    // If we scrolled, update the selection
+                    const currentCell = document.elementFromPoint(
+                      currentMouseX,
+                      currentMouseY
+                    );
+                    if (
+                      currentCell &&
+                      currentCell.closest('.selectable') &&
+                      currentCell !== lastCell
+                    ) {
+                      selectRange(
+                        startCell,
+                        currentCell.closest('.selectable')
+                      );
+                      lastCell = currentCell.closest('.selectable');
+                    }
+                  }
+                }, 50);
+              }
+            }
+          });
+
+          // Mouse up event - end selection
+          document.addEventListener('mouseup', function () {
+            if (isSelecting) {
+              isSelecting = false;
+              table.classList.remove('selecting');
+
+              // Clear auto-scroll interval
+              if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+              }
+            }
+          });
+
+          // Add copy button functionality
+          const copyBtn = tableContainer
+            ? tableContainer.querySelector('[data-action="copy-selected"]')
+            : null;
+          if (copyBtn) {
+            copyBtn.addEventListener('click', function () {
+              if (selectedCells.size === 0) {
+                alert('Please select cells to copy');
+                return;
+              }
+
+              // Get all selected rows and columns
+              const rowIndices = new Set();
+              const colIndices = new Set();
+              selectedCells.forEach((cell) => {
+                rowIndices.add(cell.parentNode.rowIndex);
+                colIndices.add(cell.cellIndex);
+              });
+
+              // Sort rows and columns
+              const sortedRows = Array.from(rowIndices).sort((a, b) => a - b);
+              const sortedCols = Array.from(colIndices).sort((a, b) => a - b);
+
+              // Create a 2D array for the selected data
+              const data = [];
+              for (const rowIndex of sortedRows) {
+                const rowData = [];
+                for (const colIndex of sortedCols) {
+                  const cell = table.rows[rowIndex].cells[colIndex];
+                  rowData.push(
+                    cell && cell.classList.contains('selected')
+                      ? cell.textContent.trim()
+                      : ''
+                  );
+                }
+                data.push(rowData);
+              }
+
+              // Convert to tab-delimited text
+              const text = data.map((row) => row.join('\t')).join('\n');
+
+              // Copy to clipboard
+              navigator.clipboard
+                .writeText(text)
+                .then(() => {
+                  // Show success message
+                  const originalText = copyBtn.textContent;
+                  copyBtn.textContent = 'Copied!';
+                  setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                  }, 2000);
+                })
+                .catch((err) => {
+                  console.error('Failed to copy: ', err);
+                  alert('Failed to copy to clipboard: ' + err.message);
+                });
+            });
+          }
+        });
+
+        // Add keyboard shortcut for clearing selection (Escape key)
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') {
+            const tables = document.querySelectorAll('table.selectable-table');
+            tables.forEach((table) => {
+              const selectedCells = table.querySelectorAll('.selected');
+              selectedCells.forEach((cell) => {
+                cell.classList.remove('selected');
+                cell.classList.remove('selection-start');
+              });
+
+              // Update selection info
+              const tableContainer = table.closest('.table-container');
+              const selectionInfo = tableContainer
+                ? tableContainer.querySelector('.grid-status')
+                : null;
+              if (selectionInfo) {
+                selectionInfo.style.display = 'none';
+              }
+            });
+
+            // Clear PDF cell highlights
+            clearPdfCellHighlights();
+          }
+        });
+      }
+
+      // Function to set up table visibility observers
+      function setupTableVisibilityObservers() {
+        // Get all table containers
+        const tableContainers = document.querySelectorAll('.table-container');
+
+        if (tableContainers.length === 0) {
+          console.log('No table containers found to observe');
+          return;
+        }
+
+        // Log page numbers for debugging
+        tableContainers.forEach((container) => {
+          const pageNum = container.getAttribute('data-page');
+          console.log(`Table container found with page number: ${pageNum}`);
+        });
+
+        // Find the scrollable container that holds the tables
+        // Try multiple possible container selectors
+        const possibleContainers = [
+          document.querySelector('.tables-container-content'),
+          document.querySelector('.tables-container-wrapper'),
+          document.querySelector('.split-pane-right'),
+          document.getElementById('tables-container'),
+          document.getElementById('tables-container').parentElement,
+        ];
+
+        const tablesScrollContainer = possibleContainers.find(
+          (container) => container !== null
+        );
+
+        if (!tablesScrollContainer) {
+          console.error('Could not find scrollable container for tables');
+          return;
+        }
+
+        console.log(
+          `Using scroll container: ${
+            tablesScrollContainer.className ||
+            tablesScrollContainer.id ||
+            'unnamed-container'
+          }`
+        );
+
+        // Force a small delay to ensure the DOM is fully rendered
+        setTimeout(() => {
+          console.log('Setting up intersection observer after delay');
+
+          // Create an Intersection Observer with more aggressive settings
+          const observer = new IntersectionObserver(
+            (entries) => {
+              // Log all entries for debugging
+              entries.forEach((entry) => {
+                const entryPageNum = entry.target.getAttribute('data-page');
+                console.log(
+                  `Table page ${entryPageNum} intersection: ${entry.intersectionRatio.toFixed(
+                    2
+                  )}`
+                );
+              });
+
+              // Sort entries by intersection ratio (most visible first)
+              const sortedEntries = [...entries].sort(
+                (a, b) => b.intersectionRatio - a.intersectionRatio
+              );
+
+              // Find the most visible entry that is intersecting
+              const mostVisibleEntry = sortedEntries.find(
+                (entry) => entry.isIntersecting && entry.intersectionRatio > 0.1
+              );
+
+              if (mostVisibleEntry) {
+                // Get the page number from the table container
+                const pageNum = parseInt(
+                  mostVisibleEntry.target.getAttribute('data-page')
+                );
+
+                if (!isNaN(pageNum) && pdfDoc && currentPage !== pageNum) {
+                  console.log(
+                    `Table from page ${pageNum} is now most visible (ratio: ${mostVisibleEntry.intersectionRatio.toFixed(
+                      2
+                    )}), switching PDF view from page ${currentPage}`
+                  );
+
+                  // Add visual indicator to the table
+                  tableContainers.forEach((container) => {
+                    container.classList.remove('current-pdf-page');
+                  });
+                  mostVisibleEntry.target.classList.add('current-pdf-page');
+
+                  // Switch PDF page
+                  renderPdfPage(pageNum);
+                }
+              }
+            },
+            {
+              root: null, // Use viewport instead of a specific container for more reliable detection
+              rootMargin: '0px',
+              threshold: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], // Multiple thresholds for better accuracy
+            }
+          );
+
+          // Observe each table container
+          tableContainers.forEach((container) => {
+            observer.observe(container);
+            console.log(
+              `Now observing table container for page ${container.getAttribute(
+                'data-page'
+              )}`
+            );
+          });
+        }, 500); // 500ms delay
+
+        // Add click handlers to all table containers
+        tableContainers.forEach((container) => {
+          // Add click handler to jump to corresponding PDF page
+          container.addEventListener('click', (e) => {
+            // Only trigger if clicking on the container itself or its header, not on table cells
+            if (
+              e.target === container ||
+              e.target.classList.contains('table-page') ||
+              e.target.classList.contains('grid-toolbar')
+            ) {
+              const pageNum = parseInt(container.getAttribute('data-page'));
+              if (!isNaN(pageNum) && pdfDoc && currentPage !== pageNum) {
+                console.log(
+                  `Clicked on table from page ${pageNum}, switching PDF view`
+                );
+                renderPdfPage(pageNum);
+              }
+            }
+          });
+        });
+
+        // Add CSS for visual indicator
+        const style = document.createElement('style');
+        style.textContent = `
+          .table-container.current-pdf-page {
+            border-left: 4px solid #0066ff;
+            box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+          }
+        `;
+        document.head.appendChild(style);
+
+        console.log(
+          `Set up visibility observers for ${tableContainers.length} tables`
+        );
+      }
+
+      // Function to display response with tables
+      function displayResponse(data, responseInfo = {}) {
+        const responseElement = document.getElementById('response');
+        const statusElement = document.getElementById('response-status');
+        const statsElement = document.getElementById('response-stats');
+        const compressionElement = document.getElementById('compression-info');
+        const tablesContainer = document.getElementById('tables-container');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        // Hide loading overlay
+        loadingOverlay.style.display = 'none';
+
+        // Clear previous tables
+        tablesContainer.innerHTML = '';
+
+        // Reset PDF data
+        pdfFile = null;
+        pdfDoc = null;
+        pdfPages = {};
+
+        // Clean up any object URLs
+        const objectURLs = document.querySelectorAll('img[src^="blob:"]');
+        objectURLs.forEach((img) => {
+          if (img.src && img.src.startsWith('blob:')) {
+            URL.revokeObjectURL(img.src);
+          }
+        });
+
+        try {
+          // If data is a string, try to parse it as JSON
+          const jsonData = typeof data === 'string' ? JSON.parse(data) : data;
+
+          // Log the data for debugging
+          console.log('Received data:', jsonData);
+
+          // Display status and stats
+          if (jsonData.JobId && jsonData.Blocks) {
+            statusElement.innerHTML = `<strong>Job ID:</strong> ${jsonData.JobId} | <strong>Status:</strong> ${jsonData.Status}`;
+
+            // Count block types
+            const blockTypeCounts = {};
+            jsonData.Blocks.forEach((block) => {
+              blockTypeCounts[block.BlockType] =
+                (blockTypeCounts[block.BlockType] || 0) + 1;
+            });
+
+            // Create stats HTML
+            let statsHtml = `<strong>Total Blocks:</strong> ${jsonData.Blocks.length}<br>`;
+            statsHtml += '<strong>Block Types:</strong> ';
+            for (const [type, count] of Object.entries(blockTypeCounts)) {
+              statsHtml += `${type}: ${count}, `;
+            }
+            statsHtml = statsHtml.slice(0, -2); // Remove trailing comma and space
+
+            statsElement.innerHTML = statsHtml;
+
+            // Create a map of blocks by ID for quick lookup
+            const blockMap = {};
+            jsonData.Blocks.forEach((block) => {
+              blockMap[block.Id] = block;
+            });
+
+            // Find all tables and render them
+            const tables = jsonData.Blocks.filter(
+              (block) => block.BlockType === 'TABLE'
+            );
+
+            if (tables.length > 0) {
+              // Add table summary
+              const summaryDiv = document.createElement('div');
+              summaryDiv.className = 'table-summary';
+              summaryDiv.innerHTML = `<h2>Table Summary</h2>
+              <p>Found ${tables.length} table${
+                tables.length !== 1 ? 's' : ''
+              } in the document.</p>`;
+
+              // Add PDF processing button if there are tables
+              const pdfButtonDiv = document.createElement('div');
+              pdfButtonDiv.className = 'pdf-processing';
+              pdfButtonDiv.innerHTML = `
+                <p><strong>Step 1:</strong> Upload a PDF file using the file input at the top of the page.</p>
+                <p><strong>Step 2:</strong> Click the button below to extract table images from your PDF:</p>
+                <button id="process-pdf-btn">Extract Table Images from PDF</button>
+                <span id="pdf-status" class="pdf-status"></span>
+                <p><small>After processing, each table will have a download button for its image.</small></p>
+              `;
+
+              summaryDiv.appendChild(pdfButtonDiv);
+              tablesContainer.appendChild(summaryDiv);
+
+              // Group tables by page
+              const tablesByPage = {};
+              tables.forEach((table) => {
+                if (table.Page) {
+                  tablesByPage[table.Page] = tablesByPage[table.Page] || [];
+                  tablesByPage[table.Page].push(table);
+                }
+              });
+
+              // Store created table elements
+              const tableElements = [];
+
+              // Render tables by page
+              Object.keys(tablesByPage)
+                .sort((a, b) => parseInt(a) - parseInt(b))
+                .forEach((pageNum) => {
+                  const pageTables = tablesByPage[pageNum];
+                  pageTables.forEach((table) => {
+                    const tableElement = createTableFromBlocks(
+                      table,
+                      jsonData.Blocks,
+                      blockMap,
+                      parseInt(pageNum)
+                    );
+
+                    if (tableElement) {
+                      tablesContainer.appendChild(tableElement);
+                      tableElements.push(tableElement);
+                    }
+                  });
+                });
+
+              // Initialize our custom table selection
+              setupCustomTableSelection();
+
+              // Add event listener for PDF processing button
+              document
+                .getElementById('process-pdf-btn')
+                .addEventListener('click', async () => {
+                  const statusElement = document.getElementById('pdf-status');
+                  const pdfButton = document.getElementById('process-pdf-btn');
+
+                  // Check if PDF file is selected
+                  const fileInput = document.getElementById('pdf-file');
+                  if (!fileInput.files || fileInput.files.length === 0) {
+                    statusElement.textContent =
+                      'Please select a PDF file first';
+                    statusElement.style.color = 'red';
+                    return;
+                  }
+
+                  // Disable button during processing
+                  pdfButton.disabled = true;
+                  statusElement.textContent = 'Processing PDF...';
+                  statusElement.style.color = 'blue';
+
+                  // Show loading overlay
+                  loadingOverlay.style.display = 'flex';
+                  const loadingText = document.getElementById('loading-text');
+                  loadingText.textContent = 'Loading PDF file...';
+
+                  // Process PDF for tables
+                  const success = await processPdfForTables(
+                    tables,
+                    tableElements
+                  );
+
+                  // Hide loading overlay
+                  loadingOverlay.style.display = 'none';
+
+                  // Update status
+                  if (success) {
+                    statusElement.textContent = `Success! Table images extracted and download buttons added`;
+                    statusElement.style.color = 'green';
+
+                    // Add a message to explain the download buttons and grid features
+                    const linkExplanation = document.createElement('div');
+                    linkExplanation.style.marginTop = '15px';
+                    linkExplanation.style.padding = '10px';
+                    linkExplanation.style.backgroundColor = '#e9f7fe';
+                    linkExplanation.style.border = '1px solid #b8d6f8';
+                    linkExplanation.style.borderRadius = '5px';
+                    linkExplanation.innerHTML = `
+                      <p><strong>Table Images Ready!</strong> Each table now has a download button for its image.</p>
+                      <p>You can also use the Excel-like grid features:</p>
+                      <ul>
+                        <li>Click and drag to select cells</li>
+                        <li>Use Shift+Click to extend selection</li>
+                        <li>Use Ctrl/Cmd+Click for multiple selections</li>
+                        <li>Press Ctrl+C to copy selected cells</li>
+                        <li>Use the "Copy Selected" button to copy selected cells</li>
+                      </ul>
+                    `;
+                    document
+                      .querySelector('.pdf-processing')
+                      .appendChild(linkExplanation);
+
+                    // Highlight the image info divs to draw attention to them
+                    const imageInfoDivs =
+                      document.querySelectorAll('.table-image-info');
+
+                    console.log(
+                      `Found ${imageInfoDivs.length} image info divs`
+                    );
+
+                    // Add a pulse animation
+                    const style = document.createElement('style');
+                    style.textContent = `
+                      @keyframes pulse {
+                        0% { background-color: #f8f9fa; }
+                        50% { background-color: #e2f0ff; }
+                        100% { background-color: #f8f9fa; }
+                      }
+                    `;
+                    document.head.appendChild(style);
+
+                    // Apply animation to all image info divs
+                    imageInfoDivs.forEach((div) => {
+                      div.style.animation = 'pulse 2s';
+                      div.style.animationIterationCount = '3';
+                    });
+
+                    // Initialize our custom table selection
+                    setupCustomTableSelection();
+
+                    // Set up table visibility observers for PDF page synchronization
+                    setupTableVisibilityObservers();
+                  } else {
+                    statusElement.textContent = 'Error processing PDF';
+                    statusElement.style.color = 'red';
+                  }
+
+                  // Re-enable button
+                  pdfButton.disabled = false;
+                });
+            } else {
+              // No tables found
+              tablesContainer.innerHTML =
+                '<div class="no-tables">No tables found in the document.</div>';
+            }
+          } else {
+            statusElement.textContent = 'Response received';
+            statsElement.textContent = '';
+            tablesContainer.innerHTML =
+              '<div class="no-tables">No valid Textract data found.</div>';
+          }
+
+          // Display compression info
+          const jsonString = JSON.stringify(jsonData);
+          const originalSize = jsonString.length;
+
+          // Calculate sizes in KB
+          const originalKB = (originalSize / 1024).toFixed(2);
+
+          // Get response size from headers if available
+          const transferSize = responseInfo.transferSize || 0;
+          const transferKB = (transferSize / 1024).toFixed(2);
+
+          // Calculate compression ratio if we have both sizes
+          let compressionHtml = `<strong>Response Size (Client):</strong> ${originalKB} KB<br>`;
+
+          if (transferSize) {
+            const ratio = (
+              ((originalSize - transferSize) / originalSize) *
+              100
+            ).toFixed(2);
+            compressionHtml += `<strong>Transfer Size:</strong> ${transferKB} KB<br>`;
+            compressionHtml += `<strong>Compression Ratio:</strong> ${ratio}% reduction`;
+          } else {
+            compressionHtml +=
+              '<strong>Transfer Size:</strong> Unknown (CORS or local file)';
+          }
+
+          compressionElement.innerHTML = compressionHtml;
+
+          // Format and display the JSON (hidden by default)
+          responseElement.textContent = JSON.stringify(jsonData, null, 2);
+        } catch (error) {
+          // If not valid JSON or other error, display detailed error
+          console.error('Error processing response:', error);
+          statusElement.textContent = 'Error: ' + error.message;
+          statsElement.textContent = '';
+          compressionElement.textContent = '';
+          responseElement.textContent =
+            typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+
+          // Show more detailed error information
+          tablesContainer.innerHTML = `<div class="no-tables">
+              <h3>Error processing data</h3>
+              <p>${error.message}</p>
+              <p>Check the browser console for more details.</p>
+              <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; white-space: pre-wrap; max-height: 200px; overflow: auto;">
+                ${error.stack || 'No stack trace available'}
+              </div>
+            </div>`;
+        }
+      }
+
+      document.getElementById('get-btn').addEventListener('click', async () => {
+        const s3Url = document.getElementById('s3-url').value;
+        if (!s3Url) {
+          alert('Please enter an S3 URL');
+          return;
+        }
+
+        const statusElement = document.getElementById('response-status');
+        const statsElement = document.getElementById('response-stats');
+        const responseElement = document.getElementById('response');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+
+        try {
+          // Show loading overlay with timer
+          loadingOverlay.style.display = 'flex';
+
+          let startTime = Date.now();
+          let timerInterval = setInterval(() => {
+            const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsedSeconds / 60);
+            const seconds = elapsedSeconds % 60;
+            loadingText.textContent = `Processing... This may take some time. (${minutes}:${seconds
+              .toString()
+              .padStart(2, '0')})`;
+          }, 1000);
+
+          // Initial message
+          loadingText.textContent =
+            'Processing... This may take some time. (0:00)';
+          statusElement.textContent = '';
+          statsElement.textContent = '';
+          responseElement.textContent = '';
+
+          // Use the absolute URL with port 3000 where the Node.js server is running
+          const response = await fetch(
+            `http://localhost:3000/process-pdf?s3Url=${encodeURIComponent(
+              s3Url
+            )}`
+          );
+          const data = await response.json();
+
+          // Get response size information
+          const responseInfo = {
+            transferSize: response.headers.get('content-length')
+              ? parseInt(response.headers.get('content-length'))
+              : 0,
+          };
+
+          // Stop the timer
+          clearInterval(timerInterval);
+
+          // Calculate total time
+          const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          statusElement.textContent = `Processing completed in ${minutes}:${seconds
+            .toString()
+            .padStart(2, '0')}`;
+          statusElement.className = 'status-completed';
+
+          displayResponse(data, responseInfo);
+
+          // Set up table visibility observers for PDF page synchronization
+          setupTableVisibilityObservers();
+        } catch (error) {
+          // Hide loading overlay
+          loadingOverlay.style.display = 'none';
+
+          // Stop the timer if it's running
+          if (timerInterval) {
+            clearInterval(timerInterval);
+          }
+
+          // Calculate total time
+          const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+
+          statusElement.textContent = `Error after ${minutes}:${seconds
+            .toString()
+            .padStart(2, '0')}`;
+          statusElement.className = 'status-error';
+          statsElement.textContent = '';
+          responseElement.textContent = `Error: ${error.message}`;
+        }
+      });
+
+      // Handle file selection
+      document
+        .getElementById('pdf-file')
+        .addEventListener('change', (event) => {
+          const fileInput = event.target;
+          const fileInfo = document.getElementById('file-info');
+          const uploadBtn = document.getElementById('upload-btn');
+
+          if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            // Display file info
+            fileInfo.textContent = `Selected: ${file.name} (${(
+              file.size / 1024
+            ).toFixed(2)} KB)`;
+            // Enable upload button
+            uploadBtn.disabled = false;
+          } else {
+            fileInfo.textContent = 'No file selected';
+            uploadBtn.disabled = true;
+          }
+        });
+
+      // Handle file upload and processing
+      document
+        .getElementById('upload-btn')
+        .addEventListener('click', async () => {
+          const fileInput = document.getElementById('pdf-file');
+
+          if (!fileInput.files.length) {
+            alert('Please select a PDF file first');
+            return;
+          }
+
+          const file = fileInput.files[0];
+          const statusElement = document.getElementById('response-status');
+          const statsElement = document.getElementById('response-stats');
+          const responseElement = document.getElementById('response');
+          const loadingOverlay = document.getElementById('loading-overlay');
+          const loadingText = document.getElementById('loading-text');
+
+          try {
+            // Show loading overlay with timer
+            loadingOverlay.style.display = 'flex';
+
+            let startTime = Date.now();
+            let timerInterval = setInterval(() => {
+              const elapsedSeconds = Math.floor(
+                (Date.now() - startTime) / 1000
+              );
+              const minutes = Math.floor(elapsedSeconds / 60);
+              const seconds = elapsedSeconds % 60;
+              loadingText.textContent = `Processing... This may take some time. (${minutes}:${seconds
+                .toString()
+                .padStart(2, '0')})`;
+            }, 1000);
+
+            // Initial message
+            loadingText.textContent = 'Uploading PDF file... (0:00)';
+            statusElement.textContent = '';
+            statsElement.textContent = '';
+            responseElement.textContent = '';
+
+            // Create form data
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+
+            // Step 1: Upload the file to S3
+            const uploadResponse = await fetch(
+              'http://localhost:3000/upload-pdf',
+              {
+                method: 'POST',
+                body: formData,
+              }
+            );
+
+            if (!uploadResponse.ok) {
+              throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+            }
+
+            const uploadData = await uploadResponse.json();
+
+            // Update loading message
+            loadingText.textContent =
+              'PDF uploaded. Processing with Textract... (0:00)';
+
+            // Step 2: Process the uploaded file with Textract
+            const processResponse = await fetch(
+              'http://localhost:3000/process-pdf',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ s3Url: uploadData.s3Url }),
+              }
+            );
+
+            const data = await processResponse.json();
+
+            // Get response size information
+            const responseInfo = {
+              transferSize: processResponse.headers.get('content-length')
+                ? parseInt(processResponse.headers.get('content-length'))
+                : 0,
+            };
+
+            // Stop the timer
+            clearInterval(timerInterval);
+
+            // Calculate total time
+            const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            statusElement.textContent = `Processing completed in ${minutes}:${seconds
+              .toString()
+              .padStart(2, '0')}`;
+            statusElement.className = 'status-completed';
+
+            displayResponse(data, responseInfo);
+
+            // Set up table visibility observers for PDF page synchronization
+            setupTableVisibilityObservers();
+          } catch (error) {
+            // Hide loading overlay
+            loadingOverlay.style.display = 'none';
+
+            // Stop the timer if it's running
+            if (timerInterval) {
+              clearInterval(timerInterval);
+            }
+
+            // Calculate total time
+            const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+
+            statusElement.textContent = `Error after ${minutes}:${seconds
+              .toString()
+              .padStart(2, '0')}`;
+            statusElement.className = 'status-error';
+            statsElement.textContent = '';
+            responseElement.textContent = `Error: ${error.message}`;
+          }
+        });
+
+      // No PDF viewer controls needed anymore
+      window.addEventListener('load', () => {
+        // Initialize any other components if needed
+      });
+
+      // Update PDF viewer when a file is selected
+      document
+        .getElementById('pdf-file')
+        .addEventListener('change', async (e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            try {
+              // Load the PDF
+              await loadPdfFromInput();
+
+              // Render all pages
+              if (pdfDoc) {
+                zoomLevel = 1.0;
+                await renderAllPdfPages();
+              }
+            } catch (error) {
+              console.error('Error loading PDF:', error);
+            }
+          }
+        });
+
+      // Add event listener to process PDF button to also update the PDF viewer
+      document.addEventListener('click', (e) => {
+        if (e.target.id === 'process-pdf-btn') {
+          // The PDF is already loaded by loadPdfFromInput, so we just need to render it
+          if (pdfDoc) {
+            zoomLevel = 1.0;
+            renderAllPdfPages();
+          }
+        }
+      });
+
+      document
+        .getElementById('post-btn')
+        .addEventListener('click', async () => {
+          const s3Url = document.getElementById('s3-url').value;
+          if (!s3Url) {
+            alert('Please enter an S3 URL');
+            return;
+          }
+
+          const statusElement = document.getElementById('response-status');
+          const statsElement = document.getElementById('response-stats');
+          const responseElement = document.getElementById('response');
+          const loadingOverlay = document.getElementById('loading-overlay');
+          const loadingText = document.getElementById('loading-text');
+
+          try {
+            // Show loading overlay with timer
+            loadingOverlay.style.display = 'flex';
+
+            let startTime = Date.now();
+            let timerInterval = setInterval(() => {
+              const elapsedSeconds = Math.floor(
+                (Date.now() - startTime) / 1000
+              );
+              const minutes = Math.floor(elapsedSeconds / 60);
+              const seconds = elapsedSeconds % 60;
+              loadingText.textContent = `Processing... This may take some time. (${minutes}:${seconds
+                .toString()
+                .padStart(2, '0')})`;
+            }, 1000);
+
+            // Initial message
+            loadingText.textContent =
+              'Processing... This may take some time. (0:00)';
+            statusElement.textContent = '';
+            statsElement.textContent = '';
+            responseElement.textContent = '';
+
+            // Use the absolute URL with port 3000 where the Node.js server is running
+            const response = await fetch('http://localhost:3000/process-pdf', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ s3Url }),
+            });
+            const data = await response.json();
+
+            // Get response size information
+            const responseInfo = {
+              transferSize: response.headers.get('content-length')
+                ? parseInt(response.headers.get('content-length'))
+                : 0,
+            };
+
+            // Stop the timer
+            clearInterval(timerInterval);
+
+            // Calculate total time
+            const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            statusElement.textContent = `Processing completed in ${minutes}:${seconds
+              .toString()
+              .padStart(2, '0')}`;
+            statusElement.className = 'status-completed';
+
+            displayResponse(data, responseInfo);
+
+            // Set up table visibility observers for PDF page synchronization
+            setupTableVisibilityObservers();
+          } catch (error) {
+            // Hide loading overlay
+            loadingOverlay.style.display = 'none';
+
+            // Stop the timer if it's running
+            if (timerInterval) {
+              clearInterval(timerInterval);
+            }
+
+            // Calculate total time
+            const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+
+            statusElement.textContent = `Error after ${minutes}:${seconds
+              .toString()
+              .padStart(2, '0')}`;
+            statusElement.className = 'status-error';
+            statsElement.textContent = '';
+            responseElement.textContent = `Error: ${error.message}`;
+          }
+        });
+    </script>
+  </body>
+</html>

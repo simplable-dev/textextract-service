@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test AWS PDF Server</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      h1 {
+        color: #333;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input[type='text'] {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      button {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      #response-container {
+        margin-top: 20px;
+      }
+      #response-status {
+        padding: 10px;
+        background-color: #e7f3fe;
+        border-left: 5px solid #2196f3;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+      /* Style classes for the timer */
+      .status-processing {
+        background-color: #fff3cd !important;
+        border-left-color: #ffc107 !important;
+      }
+      .status-completed {
+        background-color: #d4edda !important;
+        border-left-color: #28a745 !important;
+      }
+      .status-error {
+        background-color: #f8d7da !important;
+        border-left-color: #dc3545 !important;
+      }
+      #response-stats {
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-left: 5px solid #4caf50;
+        margin-bottom: 10px;
+        line-height: 1.6;
+      }
+      #compression-info {
+        padding: 10px;
+        background-color: #e8f4fd;
+        border-left: 5px solid #007bff;
+        margin-bottom: 10px;
+        line-height: 1.6;
+        font-size: 0.9em;
+      }
+      #response {
+        padding: 15px;
+        border: 1px solid #ddd;
+        background-color: #f9f9f9;
+        min-height: 50px;
+        max-height: 500px;
+        overflow: auto;
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+        display: none; /* Hide the JSON view by default */
+      }
+
+      /* Table styles */
+      #tables-container {
+        margin-top: 20px;
+      }
+      .table-container {
+        margin: 24px 0 32px 0;
+        page-break-inside: avoid;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .table-title {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 8px;
+        text-align: center;
+        padding: 10px;
+        background-color: #4a6da7;
+        color: white;
+      }
+      .table-page {
+        color: #666;
+        font-size: 12px;
+        text-align: right;
+        margin-bottom: 4px;
+        font-style: italic;
+        padding: 5px 10px;
+        background-color: #f8f8f8;
+        border-bottom: 1px solid #ddd;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0;
+        font-size: 14px;
+      }
+      th,
+      td {
+        border: 0.5px solid #000;
+        padding: 6px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+      }
+      th[scope='col'] {
+        background-color: #e6e6e6;
+        border-bottom: 1px solid #999;
+      }
+      th[scope='row'] {
+        background-color: #f5f5f5;
+        text-align: left;
+        font-weight: bold;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+
+      /* Loading overlay */
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.8);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      .spinner {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 2s linear infinite;
+        margin-bottom: 20px;
+      }
+      .loading-text {
+        font-size: 18px;
+        color: #333;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Toggle button */
+      .view-toggle {
+        margin: 10px 0;
+        text-align: right;
+      }
+      .view-toggle button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .view-toggle button:hover {
+        background-color: #0069d9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Test AWS PDF Server</h1>
+
+    <div class="form-group">
+      <label for="s3-url">S3 URL to PDF:</label>
+      <input
+        type="text"
+        id="s3-url"
+        placeholder="https://your-bucket.s3.amazonaws.com/your-file.pdf"
+      />
+    </div>
+
+    <div class="form-group">
+      <button id="get-btn">Send GET Request</button>
+      <button id="post-btn">Send POST Request</button>
+    </div>
+
+    <div>
+      <h3>Response:</h3>
+      <div id="response-container">
+        <div id="response-status"></div>
+        <div id="response-stats"></div>
+        <div id="compression-info"></div>
+
+        <!-- Toggle button to switch between tables and JSON view -->
+        <div class="view-toggle">
+          <button id="toggle-view-btn" onclick="toggleView()">
+            Show JSON View
+          </button>
+        </div>
+
+        <!-- Tables container -->
+        <div id="tables-container"></div>
+
+        <!-- JSON response (hidden by default) -->
+        <pre id="response"></pre>
+      </div>
+
+      <!-- Loading overlay -->
+      <div id="loading-overlay" class="loading-overlay" style="display: none">
+        <div class="spinner"></div>
+        <div id="loading-text" class="loading-text">
+          Processing... This may take some time. (0:00)
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Function to format and display the response
+      function displayResponse(data, responseInfo = {}) {
+        const responseElement = document.getElementById('response');
+        const statusElement = document.getElementById('response-status');
+        const statsElement = document.getElementById('response-stats');
+        const compressionElement = document.getElementById('compression-info');
+
+        try {
+          // If data is a string, try to parse it as JSON
+          const jsonData = typeof data === 'string' ? JSON.parse(data) : data;
+
+          // Display status and stats
+          if (jsonData.JobId && jsonData.Blocks) {
+            statusElement.innerHTML = `<strong>Job ID:</strong> ${jsonData.JobId} | <strong>Status:</strong> ${jsonData.Status}`;
+
+            // Count block types
+            const blockTypeCounts = {};
+            jsonData.Blocks.forEach((block) => {
+              blockTypeCounts[block.BlockType] =
+                (blockTypeCounts[block.BlockType] || 0) + 1;
+            });
+
+            // Create stats HTML
+            let statsHtml = `<strong>Total Blocks:</strong> ${jsonData.Blocks.length}<br>`;
+            statsHtml += '<strong>Block Types:</strong> ';
+            for (const [type, count] of Object.entries(blockTypeCounts)) {
+              statsHtml += `${type}: ${count}, `;
+            }
+            statsHtml = statsHtml.slice(0, -2); // Remove trailing comma and space
+
+            statsElement.innerHTML = statsHtml;
+          } else {
+            statusElement.textContent = 'Response received';
+            statsElement.textContent = '';
+          }
+
+          // Display compression info
+          const jsonString = JSON.stringify(jsonData);
+          const originalSize = jsonString.length;
+
+          // Calculate sizes in KB
+          const originalKB = (originalSize / 1024).toFixed(2);
+
+          // Get response size from headers if available
+          const transferSize = responseInfo.transferSize || 0;
+          const transferKB = (transferSize / 1024).toFixed(2);
+
+          // Calculate compression ratio if we have both sizes
+          let compressionHtml = `<strong>Response Size (Client):</strong> ${originalKB} KB<br>`;
+
+          if (transferSize) {
+            const ratio = (
+              ((originalSize - transferSize) / originalSize) *
+              100
+            ).toFixed(2);
+            compressionHtml += `<strong>Transfer Size:</strong> ${transferKB} KB<br>`;
+            compressionHtml += `<strong>Compression Ratio:</strong> ${ratio}% reduction`;
+          } else {
+            compressionHtml +=
+              '<strong>Transfer Size:</strong> Unknown (CORS or local file)';
+          }
+
+          compressionElement.innerHTML = compressionHtml;
+
+          // Format and display the JSON
+          responseElement.textContent = JSON.stringify(jsonData, null, 2);
+        } catch (error) {
+          // If not valid JSON, just display as text
+          statusElement.textContent = 'Response received (not JSON)';
+          statsElement.textContent = '';
+          compressionElement.textContent = '';
+          responseElement.textContent = data;
+        }
+      }
+
+      document.getElementById('get-btn').addEventListener('click', async () => {
+        const s3Url = document.getElementById('s3-url').value;
+        if (!s3Url) {
+          alert('Please enter an S3 URL');
+          return;
+        }
+
+        const statusElement = document.getElementById('response-status');
+        const statsElement = document.getElementById('response-stats');
+        const responseElement = document.getElementById('response');
+
+        try {
+          // Show loading message with timer
+          let startTime = Date.now();
+          let timerInterval = setInterval(() => {
+            const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsedSeconds / 60);
+            const seconds = elapsedSeconds % 60;
+            statusElement.textContent = `Processing... This may take some time. (${minutes}:${seconds
+              .toString()
+              .padStart(2, '0')})`;
+          }, 1000);
+
+          // Initial message
+          statusElement.textContent =
+            'Processing... This may take some time. (0:00)';
+          statusElement.className = 'status-processing';
+          statsElement.textContent = '';
+          responseElement.textContent = '';
+
+          const response = await fetch(
+            `/process-pdf?s3Url=${encodeURIComponent(s3Url)}`
+          );
+          const data = await response.json();
+
+          // Get response size information
+          const responseInfo = {
+            transferSize: response.headers.get('content-length')
+              ? parseInt(response.headers.get('content-length'))
+              : 0,
+          };
+
+          // Stop the timer
+          clearInterval(timerInterval);
+
+          // Calculate total time
+          const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          statusElement.textContent = `Processing completed in ${minutes}:${seconds
+            .toString()
+            .padStart(2, '0')}`;
+          statusElement.className = 'status-completed';
+
+          displayResponse(data, responseInfo);
+        } catch (error) {
+          // Stop the timer if it's running
+          if (timerInterval) {
+            clearInterval(timerInterval);
+          }
+
+          // Calculate total time
+          const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+
+          statusElement.textContent = `Error after ${minutes}:${seconds
+            .toString()
+            .padStart(2, '0')}`;
+          statusElement.className = 'status-error';
+          statsElement.textContent = '';
+          responseElement.textContent = `Error: ${error.message}`;
+        }
+      });
+
+      document
+        .getElementById('post-btn')
+        .addEventListener('click', async () => {
+          const s3Url = document.getElementById('s3-url').value;
+          if (!s3Url) {
+            alert('Please enter an S3 URL');
+            return;
+          }
+
+          const statusElement = document.getElementById('response-status');
+          const statsElement = document.getElementById('response-stats');
+          const responseElement = document.getElementById('response');
+
+          try {
+            // Show loading message with timer
+            let startTime = Date.now();
+            let timerInterval = setInterval(() => {
+              const elapsedSeconds = Math.floor(
+                (Date.now() - startTime) / 1000
+              );
+              const minutes = Math.floor(elapsedSeconds / 60);
+              const seconds = elapsedSeconds % 60;
+              statusElement.textContent = `Processing... This may take some time. (${minutes}:${seconds
+                .toString()
+                .padStart(2, '0')})`;
+            }, 1000);
+
+            // Initial message
+            statusElement.textContent =
+              'Processing... This may take some time. (0:00)';
+            statusElement.className = 'status-processing';
+            statsElement.textContent = '';
+            responseElement.textContent = '';
+
+            const response = await fetch('/process-pdf', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ s3Url }),
+            });
+            const data = await response.json();
+
+            // Get response size information
+            const responseInfo = {
+              transferSize: response.headers.get('content-length')
+                ? parseInt(response.headers.get('content-length'))
+                : 0,
+            };
+
+            // Stop the timer
+            clearInterval(timerInterval);
+
+            // Calculate total time
+            const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            statusElement.textContent = `Processing completed in ${minutes}:${seconds
+              .toString()
+              .padStart(2, '0')}`;
+            statusElement.className = 'status-completed';
+
+            displayResponse(data, responseInfo);
+          } catch (error) {
+            // Stop the timer if it's running
+            if (timerInterval) {
+              clearInterval(timerInterval);
+            }
+
+            // Calculate total time
+            const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+
+            statusElement.textContent = `Error after ${minutes}:${seconds
+              .toString()
+              .padStart(2, '0')}`;
+            statusElement.className = 'status-error';
+            statsElement.textContent = '';
+            responseElement.textContent = `Error: ${error.message}`;
+          }
+        });
+    </script>
+  </body>
+</html>

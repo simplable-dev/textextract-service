@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TextractRBush Demo</title>
+    <!-- RBush library -->
+    <script src="https://unpkg.com/rbush@3.0.1/rbush.min.js"></script>
+    <!-- Our TextractRBush library -->
+    <script src="textract-rbush.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .demo-area {
+            display: flex;
+            margin-top: 20px;
+        }
+        .pdf-container {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 10px;
+            position: relative;
+            min-height: 500px;
+            background-color: #f5f5f5;
+        }
+        .results-container {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-left: 20px;
+            overflow-y: auto;
+            max-height: 500px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        .selection-rect {
+            position: absolute;
+            border: 2px solid blue;
+            background-color: rgba(0, 0, 255, 0.1);
+            pointer-events: none;
+        }
+        .text-block {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #fff;
+            border-left: 3px solid #4CAF50;
+        }
+        .text-block-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        input[type="range"] {
+            width: 100%;
+            max-width: 300px;
+        }
+        pre {
+            background-color: #f8f8f8;
+            padding: 10px;
+            border: 1px solid #ddd;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TextractRBush Demo</h1>
+        <p>This demo shows how to use the TextractRBush library to query text from AWS TextExtract data using spatial coordinates.</p>
+        
+        <div class="controls">
+            <h3>Controls</h3>
+            <div>
+                <label for="overlap-ratio">Overlap Ratio: <span id="overlap-value">0.5</span></label>
+                <input type="range" id="overlap-ratio" min="0.1" max="1" step="0.1" value="0.5">
+            </div>
+            <p>Click and drag on the area below to create a selection rectangle and query text.</p>
+        </div>
+        
+        <div class="demo-area">
+            <div class="pdf-container" id="pdf-container">
+                <!-- This would normally contain a PDF viewer, but for demo we'll use a placeholder -->
+                <div style="text-align: center; padding-top: 200px; color: #666;">
+                    PDF Viewer Placeholder<br>
+                    (Click and drag to create a selection)
+                </div>
+            </div>
+            
+            <div class="results-container" id="results-container">
+                <h3>Query Results</h3>
+                <div id="results">
+                    <p>No results yet. Draw a selection rectangle to query text.</p>
+                </div>
+            </div>
+        </div>
+        
+        <h3>Sample Code</h3>
+        <pre>
+// Initialize TextractRBush with AWS TextExtract data
+const textractRBush = TextractRBush();
+textractRBush.initialize(textractData);
+
+// Query text within a rectangle with 50% overlap
+const results = textractRBush.query(
+    { x: 0.2, y: 0.3, width: 0.1, height: 0.05 },
+    0.5
+);
+
+// Display results
+console.log(results);
+        </pre>
+    </div>
+
+    <script>
+        // Load the sample TextExtract data
+        let textractData;
+        let textractRBush;
+        let isDrawing = false;
+        let startX = 0;
+        let startY = 0;
+        let selectionRect = null;
+        
+        // DOM elements
+        const pdfContainer = document.getElementById('pdf-container');
+        const resultsContainer = document.getElementById('results');
+        const overlapRatioSlider = document.getElementById('overlap-ratio');
+        const overlapValue = document.getElementById('overlap-value');
+        
+        // Update overlap value display when slider changes
+        overlapRatioSlider.addEventListener('input', function() {
+            overlapValue.textContent = this.value;
+            if (selectionRect) {
+                queryTextFromSelection();
+            }
+        });
+        
+        // Initialize the demo
+        async function init() {
+            try {
+                // Fetch the sample TextExtract data
+                const response = await fetch('hardcoddedData.json');
+                if (!response.ok) {
+                    throw new Error('Failed to load sample data');
+                }
+                
+                textractData = await response.json();
+                console.log('Loaded TextExtract data with', textractData.Blocks.length, 'blocks');
+                
+                // Initialize TextractRBush
+                textractRBush = TextractRBush();
+                textractRBush.initialize(textractData);
+                console.log('TextractRBush initialized');
+                
+                // Set up event listeners for drawing selection rectangle
+                pdfContainer.addEventListener('mousedown', startDrawing);
+                pdfContainer.addEventListener('mousemove', updateDrawing);
+                pdfContainer.addEventListener('mouseup', endDrawing);
+                
+                // Show success message
+                resultsContainer.innerHTML = '<p>TextractRBush initialized successfully. Draw a selection rectangle to query text.</p>';
+            } catch (error) {
+                console.error('Error initializing demo:', error);
+                resultsContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Start drawing selection rectangle
+        function startDrawing(e) {
+            isDrawing = true;
+            
+            // Get coordinates relative to the container
+            const rect = pdfContainer.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+            
+            // Create selection rectangle element if it doesn't exist
+            if (!selectionRect) {
+                selectionRect = document.createElement('div');
+                selectionRect.className = 'selection-rect';
+                pdfContainer.appendChild(selectionRect);
+            }
+            
+            // Initialize selection rectangle
+            selectionRect.style.left = startX + 'px';
+            selectionRect.style.top = startY + 'px';
+            selectionRect.style.width = '0px';
+            selectionRect.style.height = '0px';
+        }
+        
+        // Update selection rectangle while drawing
+        function updateDrawing(e) {
+            if (!isDrawing || !selectionRect) return;
+            
+            const rect = pdfContainer.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            
+            // Calculate dimensions
+            const width = currentX - startX;
+            const height = currentY - startY;
+            
+            // Update rectangle position and size
+            if (width < 0) {
+                selectionRect.style.left = currentX + 'px';
+                selectionRect.style.width = Math.abs(width) + 'px';
+            } else {
+                selectionRect.style.left = startX + 'px';
+                selectionRect.style.width = width + 'px';
+            }
+            
+            if (height < 0) {
+                selectionRect.style.top = currentY + 'px';
+                selectionRect.style.height = Math.abs(height) + 'px';
+            } else {
+                selectionRect.style.top = startY + 'px';
+                selectionRect.style.height = height + 'px';
+            }
+        }
+        
+        // End drawing and query text
+        function endDrawing() {
+            if (!isDrawing || !selectionRect) return;
+            isDrawing = false;
+            
+            queryTextFromSelection();
+        }
+        
+        // Query text from the current selection
+        function queryTextFromSelection() {
+            if (!selectionRect || !textractRBush) return;
+            
+            // Get container dimensions
+            const containerWidth = pdfContainer.clientWidth;
+            const containerHeight = pdfContainer.clientHeight;
+            
+            // Get selection rectangle coordinates and normalize them (0-1)
+            const rectLeft = parseInt(selectionRect.style.left);
+            const rectTop = parseInt(selectionRect.style.top);
+            const rectWidth = parseInt(selectionRect.style.width);
+            const rectHeight = parseInt(selectionRect.style.height);
+            
+            const normalizedRect = {
+                x: rectLeft / containerWidth,
+                y: rectTop / containerHeight,
+                width: rectWidth / containerWidth,
+                height: rectHeight / containerHeight
+            };
+            
+            // Get overlap ratio from slider
+            const overlapRatio = parseFloat(overlapRatioSlider.value);
+            
+            // Query TextractRBush
+            const results = textractRBush.query(normalizedRect, overlapRatio);
+            
+            // Display results
+            displayResults(results, normalizedRect);
+        }
+        
+        // Display query results
+        function displayResults(results, rect) {
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<p>No text found in the selected area.</p>';
+                return;
+            }
+            
+            let html = `<p>Found ${results.length} text blocks in the selected area:</p>`;
+            
+            // Sort results by Y position (top to bottom)
+            results.sort((a, b) => a.boundingBox.Top - b.boundingBox.Top);
+            
+            results.forEach(result => {
+                const overlapPercent = Math.round(result.overlapPercentage * 100);
+                const confidence = result.confidence ? Math.round(result.confidence) : 'N/A';
+                
+                html += `
+                <div class="text-block">
+                    <div>${result.text || '(No text)'}</div>
+                    <div class="text-block-info">
+                        <div>Type: ${result.type}</div>
+                        <div>Page: ${result.page}</div>
+                        <div>Confidence: ${confidence}%</div>
+                        <div>Overlap: ${overlapPercent}%</div>
+                    </div>
+                </div>`;
+            });
+            
+            resultsContainer.innerHTML = html;
+        }
+        
+        // Initialize the demo when the page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

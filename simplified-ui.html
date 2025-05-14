@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>PDF Table Extractor</title>
+    <!-- PDF.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script>
+      // Set PDF.js worker path
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        line-height: 1.6;
+      }
+
+      /* Main layout container */
+      .main-container {
+        display: flex;
+        width: 100%;
+        height: calc(100vh - 100px);
+        gap: 20px;
+      }
+
+      /* PDF viewer container */
+      .pdf-viewer-container {
+        flex: 1;
+        min-width: 40%;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .pdf-viewer-content {
+        flex: 1;
+        overflow: auto;
+        background-color: #f0f0f0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      #pdf-canvas-container {
+        margin: 20px 0;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Tables container */
+      .tables-container-wrapper {
+        flex: 1;
+        min-width: 50%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .tables-container-content {
+        flex: 1;
+        overflow: auto;
+        padding-right: 10px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Make tables container take full height */
+      #tables-container {
+        flex: 1;
+        display: block;
+        overflow: auto;
+        margin-top: 20px;
+      }
+
+      /* Table container styling */
+      .table-container {
+        margin-bottom: 30px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+        margin: 24px 0 32px 0;
+        page-break-inside: avoid;
+      }
+      
+      .form-group {
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      
+      button {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        cursor: pointer;
+      }
+      
+      button:hover {
+        background-color: #45a049;
+      }
+      
+      /* Table styles */
+      .table-title {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 8px;
+        text-align: center;
+        padding: 10px;
+        background-color: #4a6da7;
+        color: white;
+      }
+      
+      /* Loading overlay */
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.8);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      
+      .spinner {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 2s linear infinite;
+        margin-bottom: 20px;
+      }
+      
+      .loading-text {
+        font-size: 18px;
+        color: #333;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="form-group">
+      <input type="file" id="pdf-file" accept="application/pdf" />
+      <button id="upload-btn" disabled>Upload and Process</button>
+    </div>
+
+    <!-- Main container for side-by-side layout -->
+    <div class="main-container">
+      <!-- PDF Viewer on the left -->
+      <div class="pdf-viewer-container">
+        <div class="pdf-viewer-content">
+          <div id="pdf-canvas-container"></div>
+        </div>
+      </div>
+
+      <!-- Tables on the right -->
+      <div class="tables-container-wrapper">
+        <div class="tables-container-content">
+          <!-- Tables container -->
+          <div id="tables-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none">
+      <div class="spinner"></div>
+      <div id="loading-text" class="loading-text">
+        Processing... This may take some time. (0:00)
+      </div>
+    </div>
+
+    <!-- Hidden container for PDF rendering (legacy) -->
+    <div id="pdf-container" style="display: none">
+      <canvas id="pdf-canvas"></canvas>
+    </div>
+
+    <script>
+      // Global variables for PDF handling
+      let pdfFile = null;
+      let pdfDoc = null;
+      let pdfPages = {};
+      let currentPage = 1;
+      let zoomLevel = 1.0;
+
+      // Handle file selection
+      document
+        .getElementById('pdf-file')
+        .addEventListener('change', (event) => {
+          const fileInput = event.target;
+          const uploadBtn = document.getElementById('upload-btn');
+
+          if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            // Enable upload button
+            uploadBtn.disabled = false;
+            
+            // Load the PDF for preview
+            loadPdfFromInput();
+          } else {
+            uploadBtn.disabled = true;
+          }
+        });
+
+      // Handle file upload and processing
+      document
+        .getElementById('upload-btn')
+        .addEventListener('click', async () => {
+          const fileInput = document.getElementById('pdf-file');
+
+          if (!fileInput.files.length) {
+            alert('Please select a PDF file first');
+            return;
+          }
+
+          const file = fileInput.files[0];
+          const loadingOverlay = document.getElementById('loading-overlay');
+          const loadingText = document.getElementById('loading-text');
+
+          try {
+            // Show loading overlay with timer
+            loadingOverlay.style.display = 'flex';
+            loadingText.textContent = 'Processing PDF...';
+            
+            // Process the PDF (implementation depends on your backend)
+            // This is where you would call your API to process the PDF
+            
+            // For now, just render the PDF
+            if (pdfDoc) {
+              zoomLevel = 1.0;
+              await renderAllPdfPages();
+            }
+            
+            // Hide loading overlay when done
+            loadingOverlay.style.display = 'none';
+            
+          } catch (error) {
+            console.error('Error processing PDF:', error);
+            loadingOverlay.style.display = 'none';
+            alert('Error processing PDF: ' + error.message);
+          }
+        });
+        
+      // Function to load PDF from input
+      async function loadPdfFromInput() {
+        const fileInput = document.getElementById('pdf-file');
+        if (!fileInput.files || fileInput.files.length === 0) {
+          console.log('No file selected');
+          return false;
+        }
+
+        try {
+          const file = fileInput.files[0];
+          
+          // Read the file as ArrayBuffer
+          const arrayBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+          });
+
+          // Load the PDF document
+          const loadingTask = pdfjsLib.getDocument(new Uint8Array(arrayBuffer));
+          pdfDoc = await loadingTask.promise;
+          
+          // Render the PDF
+          await renderAllPdfPages();
+          
+          return true;
+        } catch (error) {
+          console.error('Error loading PDF:', error);
+          return false;
+        }
+      }
+      
+      // Function to render all PDF pages
+      async function renderAllPdfPages() {
+        if (!pdfDoc) {
+          console.log('No PDF loaded');
+          return;
+        }
+
+        try {
+          // Clear the canvas container
+          const canvasContainer = document.getElementById('pdf-canvas-container');
+          canvasContainer.innerHTML = '';
+
+          // Create a container for all pages
+          const pagesContainer = document.createElement('div');
+          pagesContainer.className = 'pdf-pages-container';
+          pagesContainer.style.width = '100%';
+          canvasContainer.appendChild(pagesContainer);
+
+          // Render each page
+          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            // Create a container for this page
+            const pageContainer = document.createElement('div');
+            pageContainer.className = 'pdf-page-container';
+            pageContainer.setAttribute('data-page', pageNum);
+            pageContainer.id = `pdf-page-${pageNum}`;
+            pagesContainer.appendChild(pageContainer);
+
+            // Get the page
+            const pdfPage = await pdfDoc.getPage(pageNum);
+            
+            // Create canvas for this page
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-canvas';
+            canvas.setAttribute('data-page', pageNum);
+            pageContainer.appendChild(canvas);
+
+            // Calculate viewport with zoom
+            const viewport = pdfPage.getViewport({ scale: zoomLevel });
+
+            // Set canvas dimensions
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            // Render the page
+            const renderContext = {
+              canvasContext: canvas.getContext('2d'),
+              viewport: viewport,
+            };
+
+            await pdfPage.render(renderContext).promise;
+
+            // Add page number label
+            const pageLabel = document.createElement('div');
+            pageLabel.className = 'pdf-page-label';
+            pageLabel.textContent = `Page ${pageNum}`;
+            pageLabel.style.position = 'absolute';
+            pageLabel.style.top = '10px';
+            pageLabel.style.left = '10px';
+            pageLabel.style.background = 'rgba(0, 0, 0, 0.5)';
+            pageLabel.style.color = 'white';
+            pageLabel.style.padding = '5px 10px';
+            pageLabel.style.borderRadius = '3px';
+            pageLabel.style.fontSize = '12px';
+            pageLabel.style.zIndex = '100';
+            pageContainer.appendChild(pageLabel);
+          }
+        } catch (error) {
+          console.error('Error rendering PDF pages:', error);
+        }
+      }
+    </script>
+  </body>
+</html>

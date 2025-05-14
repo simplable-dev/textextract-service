@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tables from sample-text-ocr</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+<style>
+  body {
+    font-family: "Times New Roman", Times, serif;
+    line-height: 1.4;
+    margin: 0;
+    padding: 40px;
+    color: #000;
+    background-color: #fff;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  .page {
+    margin-bottom: 40px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid #ccc;
+    page-break-after: always;
+  }
+  .document-title {
+    color: #000;
+    font-size: 24px;
+    margin-bottom: 16px;
+    font-weight: bold;
+    text-align: center;
+  }
+  .document-info {
+    color: #444;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .table-summary {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    padding: 16px;
+    margin-bottom: 32px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+  }
+  .table-summary h2 {
+    color: #000;
+    font-size: 16px;
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-weight: bold;
+  }
+  .table-summary ul {
+    margin: 0;
+    padding-left: 24px;
+  }
+  .table-summary li {
+    margin-bottom: 6px;
+  }
+  h2 {
+    color: #000;
+    margin-top: 24px;
+    font-weight: bold;
+  }
+  p {
+    margin: 12px 0;
+  }
+  .table-container {
+    margin: 24px 0 32px 0;
+    page-break-inside: avoid;
+  }
+  .table-title {
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .table-page {
+    color: #666;
+    font-size: 12px;
+    text-align: right;
+    margin-bottom: 4px;
+    font-style: italic;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 0.5px solid #000;
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+  }
+  th[scope="col"] {
+    background-color: #e6e6e6;
+    border-bottom: 1px solid #999;
+  }
+  th[scope="row"] {
+    background-color: #f5f5f5;
+    text-align: left;
+    font-weight: bold;
+  }
+  tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+
+  /* Footer styles */
+  footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+  }
+  .source-info, .generation-info {
+    margin: 5px 0;
+  }
+
+  /* Print-specific styles */
+  @media print {
+    body {
+      padding: 0;
+      font-size: 12pt;
+    }
+    .table-container {
+      break-inside: avoid;
+    }
+    .table-summary {
+      background-color: transparent;
+      border: none;
+      padding: 0;
+    }
+    footer {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      border-top: 0.5px solid #ddd;
+    }
+  }
+  dl.key-value-pairs {
+    display: grid;
+    grid-template-columns: max-content auto;
+    gap: 10px;
+    margin: 15px 0;
+  }
+  dt {
+    font-weight: bold;
+    grid-column: 1;
+  }
+  dd {
+    grid-column: 2;
+    margin: 0;
+  }
+</style>
+
+  <style>
+    .pdf-upload {
+      background-color: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .pdf-upload p {
+      margin: 10px 0;
+    }
+    .pdf-upload input[type="file"] {
+      margin: 10px 0;
+    }
+    .pdf-status {
+      font-style: italic;
+      margin-top: 10px;
+    }
+    #load-pdf-btn {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 14px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    #load-pdf-btn:hover {
+      background-color: #0069d9;
+    }
+    .table-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0;
+    }
+    .toggle-view-btn {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 12px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .toggle-view-btn:hover {
+      background-color: #45a049;
+    }
+    .toggle-view-btn:disabled {
+      background-color: #cccccc;
+      color: #666666;
+      cursor: not-allowed;
+    }
+    .view-status {
+      font-size: 12px;
+      color: #666;
+      font-style: italic;
+    }
+    .table-image-container {
+      width: 100%;
+      overflow: auto;
+      border: 1px solid #ddd;
+      margin-bottom: 15px;
+    }
+    .table-image {
+      max-width: 100%;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-page="1">
+<h1 class="document-title">Tables Extracted from PDF</h1>
+
+    <div class="pdf-upload">
+      <p>To extract tables as images, upload the original PDF file:</p>
+      <input type="file" id="pdf-file-input" accept=".pdf" />
+      <button id="load-pdf-btn" onclick="loadPdfFile()">Load PDF</button>
+      <p class="pdf-status" id="pdf-status"></p>
+    </div>
+  
+<p class="document-info">This document contains 10 tables extracted from the PDF using Amazon Textract.</p><div class="table-summary"><h2>Table Summary</h2><ul><li>Page 1: 3 tables</li><li>Page 2: 5 tables</li><li>Page 3: 2 tables</li></ul></div>
+<div class="table-container" data-page="1" data-left="0.0596" data-top="0.1114" data-width="0.2248" data-height="0.0507">
+<div class="table-page">Page 1</div>
+<div class="table-title">Table from Page 1</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">PROJECT:</th>
+<th scope="col">Belgrade</th>
+</tr>
+<tr>
+<th scope="row">REMARKS:</th>
+<td>Summary List</td>
+</tr>
+</table>
+</div>
+<div class="table-container" data-page="1" data-left="0.0577" data-top="0.1973" data-width="0.8752" data-height="0.0349">
+<div class="table-page">Page 1</div>
+<div class="table-title">Table from Page 1</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">PIECE</th>
+<th scope="col"></th>
+<th scope="col"></th>
+<th scope="col">MILL</th>
+<th scope="col"></th>
+<th scope="col">CAMBER</th>
+<th scope="col">WEIGHT WEIGHT</th>
+</tr>
+<tr>
+<th scope="row">MARK</th>
+<td>QTY. TYPE DESCRIPTION</td>
+<td>LENGTH</td>
+<td>MARK</td>
+<td>GRADE</td>
+<td>or M.O. REMARKS</td>
+<td>SEQ. ONE ITEM LINE TOTAL</td>
+</tr>
+</table>
+</div>
+<div class="table-container" data-page="1" data-left="0.0581" data-top="0.2921" data-width="0.7797" data-height="0.6677">
+<div class="table-page">Page 1</div>
+<div class="table-title">SUMMARY OF ALL STOCK W SHAPES REQUIRED, INCLUDING NON-NESTABLE ITEMS:</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">STOCK ITEM DESCRIPTION</th>
+<th scope="col">LENGTH</th>
+<th scope="col">GRADE</th>
+<th scope="col">CAMBER or M.O.</th>
+<th scope="col">QTY.</th>
+<th scope="col">WT. ONE STOCK</th>
+<th scope="col">GROSS WT. WITH DROP</th>
+<th scope="col">DROP WT.</th>
+<th scope="col">% DROP</th>
+<th scope="col">NET WT. W/O DROP</th>
+<th scope="col">COMMENTS</th>
+<th scope="col"></th>
+</tr>
+<tr>
+<th scope="row">W 24 X 117</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>3510.00</td>
+<td>3510.00</td>
+<td>629.48</td>
+<td>17.9</td>
+<td>2880.52</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 24 X 104</th>
+<td>40'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>4160.00</td>
+<td>4160.00</td>
+<td>637.54</td>
+<td>15.3</td>
+<td>3522.46</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 24 X 84</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>2520.00</td>
+<td>2520.00</td>
+<td>350.88</td>
+<td>13.9</td>
+<td>2169.12</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 24 X 62</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1860.00</td>
+<td>1860.00</td>
+<td>523.45</td>
+<td>28.1</td>
+<td>1336.55</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 21 X 50</th>
+<td>30 - 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1500.00</td>
+<td>1500.00</td>
+<td>323.96</td>
+<td>21.6</td>
+<td>1176.04</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 21 X 44</th>
+<td>201-0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>880.00</td>
+<td>880.00</td>
+<td>537.40</td>
+<td>61.1</td>
+<td>342.60</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 18 I 86</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>2580.00</td>
+<td>2580.00</td>
+<td>163.94</td>
+<td>6.4</td>
+<td>2416.06</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 18 I 60</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>2</td>
+<td>1800.00</td>
+<td>3600.00</td>
+<td>450.94</td>
+<td>12.5</td>
+<td>3149.06</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 18 X 50</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1500.00</td>
+<td>1500.00</td>
+<td>474.48</td>
+<td>31.6</td>
+<td>1025.52</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 18 X 46</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>3</td>
+<td>1380.00</td>
+<td>4140.00</td>
+<td>455.69</td>
+<td>11.0</td>
+<td>3684.31</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 18 X 46</th>
+<td>40'- 0</td>
+<td>A992</td>
+<td></td>
+<td>2</td>
+<td>1840.00</td>
+<td>3680.00</td>
+<td>285.58</td>
+<td>7.8</td>
+<td>3394.42</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 18 X 40</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1200.00</td>
+<td>1200.00</td>
+<td>173.33</td>
+<td>14.4</td>
+<td>1026.67</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 18 X 40</th>
+<td>40'- 0</td>
+<td>A992</td>
+<td></td>
+<td>2</td>
+<td>1600.00</td>
+<td>3200.00</td>
+<td>402.92</td>
+<td>12.6</td>
+<td>2797.08</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 18 X 35</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1050.00</td>
+<td>1050.00</td>
+<td>193.96</td>
+<td>18.5</td>
+<td>856.04</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 16 X 67</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>2010.00</td>
+<td>2010.00</td>
+<td>368.50</td>
+<td>18.3</td>
+<td>1641.50</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 16 X 36</th>
+<td>50'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1800.00</td>
+<td>1800.00</td>
+<td>34.31</td>
+<td>1.9</td>
+<td>1765.69</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 16 X 31</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>930.00</td>
+<td>930.00</td>
+<td>22.12</td>
+<td>2.4</td>
+<td>907.88</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 16 X 31</th>
+<td>401-0</td>
+<td>A992</td>
+<td></td>
+<td>3</td>
+<td>1240.00</td>
+<td>3720.00</td>
+<td>265.44</td>
+<td>7.1</td>
+<td>3454.56</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 16 X 26</th>
+<td>30 0</td>
+<td>A992</td>
+<td></td>
+<td>7</td>
+<td>780.00</td>
+<td>5460.00</td>
+<td>408.28</td>
+<td>7.5</td>
+<td>5051.72</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 16 I 26</th>
+<td>40'- 0</td>
+<td>A992</td>
+<td></td>
+<td>3</td>
+<td>1040.00</td>
+<td>3120.00</td>
+<td>59.58</td>
+<td>1.9</td>
+<td>3060.42</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 16 x 26</th>
+<td>50'- 0</td>
+<td>A992</td>
+<td></td>
+<td>2</td>
+<td>1300.00</td>
+<td>2600.00</td>
+<td>83.42</td>
+<td>3.2</td>
+<td>2516.58</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 14 I 48</th>
+<td>20'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>960.00</td>
+<td>960.00</td>
+<td>27.00</td>
+<td>2.8</td>
+<td>933.00</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 14 I 30</th>
+<td>40'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1200.00</td>
+<td>1200.00</td>
+<td>194.69</td>
+<td>16.2</td>
+<td>1005.31</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 14 I 22</th>
+<td>30 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>660.00</td>
+<td>660.00</td>
+<td>103.81</td>
+<td>15.7</td>
+<td>556.19</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 14 X 22</th>
+<td>40'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>880.00</td>
+<td>880.00</td>
+<td>120.43</td>
+<td>13.7</td>
+<td>759.57</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 12 X 40</th>
+<td>50'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>2000.00</td>
+<td>2000.00</td>
+<td>69.17</td>
+<td>3.5</td>
+<td>1930.83</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 12 I 30</th>
+<td>30 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>900.00</td>
+<td>900.00</td>
+<td>255.47</td>
+<td>28.4</td>
+<td>644.53</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 12 I 26</th>
+<td>30 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>780.00</td>
+<td>780.00</td>
+<td>73.26</td>
+<td>9.4</td>
+<td>706.74</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 12 I 19</th>
+<td>40'- 0</td>
+<td>A992</td>
+<td></td>
+<td>2</td>
+<td>760.00</td>
+<td>1520.00</td>
+<td>30.38</td>
+<td>2.0</td>
+<td>1489.62</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 12 I 19</th>
+<td>50'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>950.00</td>
+<td>950.00</td>
+<td>130.03</td>
+<td>13.7</td>
+<td>819.97</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 12 I 16</th>
+<td>50'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>800.00</td>
+<td>800.00</td>
+<td>58.67</td>
+<td>7.3</td>
+<td>741.33</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 60</th>
+<td>20'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1200.00</td>
+<td>1200.00</td>
+<td>252.19</td>
+<td>21.0</td>
+<td>947.81</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 54</th>
+<td>20'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1080.00</td>
+<td>1080.00</td>
+<td>320.63</td>
+<td>29.7</td>
+<td>759.37</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 39</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1170.00</td>
+<td>1170.00</td>
+<td>15.44</td>
+<td>1.3</td>
+<td>1154.56</td>
+<td>SOURCE:</td>
+<td>SUPPLIER STOCK</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="page" data-page="2">
+<div class="table-container" data-page="2" data-left="0.0589" data-top="0.1103" data-width="0.2268" data-height="0.0527">
+<div class="table-page">Page 2</div>
+<div class="table-title">Table from Page 2</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">PROJECT:</th>
+<th scope="col">Belgrade</th>
+</tr>
+<tr>
+<th scope="row">REMARKS:</th>
+<td>Summary List</td>
+</tr>
+</table>
+</div>
+<div class="table-container" data-page="2" data-left="0.0580" data-top="0.1971" data-width="0.8738" data-height="0.0355">
+<div class="table-page">Page 2</div>
+<div class="table-title">Table from Page 2</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">PIECE</th>
+<th scope="col"></th>
+<th scope="col"></th>
+<th scope="col">MILL</th>
+<th scope="col"></th>
+<th scope="col">CAMBER</th>
+<th scope="col"></th>
+<th scope="col">WEIGHT EIGHT</th>
+</tr>
+<tr>
+<th scope="row"># MARK</th>
+<td>QTY. TYPE DESCRIPTION</td>
+<td>LENGTH</td>
+<td>MARK</td>
+<td>GRADE</td>
+<td>or M.O.</td>
+<td>REMARKS</td>
+<td>SEQ. ONE ITEM LINE TOTAL</td>
+</tr>
+</table>
+</div>
+<div class="table-container" data-page="2" data-left="0.0572" data-top="0.2972" data-width="0.7807" data-height="0.2889">
+<div class="table-page">Page 2</div>
+<div class="table-title">SUMMARY OF ALL STOCK W SHAPES REQUIRED, INCLUDING NON-NESTABLE ITEMS (CONTD.):</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">STOCK ITEM DESCRIPTION</th>
+<th scope="col">LENGTH</th>
+<th scope="col">GRADE</th>
+<th scope="col">CAMBER or M.O.</th>
+<th scope="col">QTY.</th>
+<th scope="col">WT. ONE STOCK</th>
+<th scope="col">GROSS WT. WITH DROP</th>
+<th scope="col">DROP WT.</th>
+<th scope="col">% DROP</th>
+<th scope="col">NET WT. W/O DROP</th>
+<th scope="col">COMMENTS</th>
+</tr>
+<tr>
+<th scope="row">W 10 I 30</th>
+<td>30'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>900.00</td>
+<td>900.00</td>
+<td>104.38</td>
+<td>11.6</td>
+<td>795.62</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 X 30</th>
+<td>40 - I 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1200.00</td>
+<td>1200.00</td>
+<td>226.88</td>
+<td>18.9</td>
+<td>973.12</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 26</th>
+<td>201-0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>520.00</td>
+<td>520.00</td>
+<td>161.96</td>
+<td>31.1</td>
+<td>358.04</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 26</th>
+<td>40'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1040.00</td>
+<td>1040.00</td>
+<td>8.67</td>
+<td>0.8</td>
+<td>1031.33</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 22</th>
+<td>50 - I 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>1100.00</td>
+<td>1100.00</td>
+<td>189.64</td>
+<td>17.2</td>
+<td>910.36</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 19</th>
+<td>20 - 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>380.00</td>
+<td>380.00</td>
+<td>226.81</td>
+<td>59.7</td>
+<td>153.19</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 17</th>
+<td>20 - 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>340.00</td>
+<td>340.00</td>
+<td>82.08</td>
+<td>24.1</td>
+<td>257.92</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 15</th>
+<td>30 - 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>450.00</td>
+<td>450.00</td>
+<td>12.73</td>
+<td>2.8</td>
+<td>437.27</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 10 I 15</th>
+<td>50 - I 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>750.00</td>
+<td>750.00</td>
+<td>121.33</td>
+<td>16.2</td>
+<td>628.67</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W8 I 28</th>
+<td>20'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>560.00</td>
+<td>560.00</td>
+<td>18.08</td>
+<td>3.2</td>
+<td>541.92</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W8 I 13</th>
+<td>40'- 0</td>
+<td>A992</td>
+<td></td>
+<td>6</td>
+<td>520.00</td>
+<td>3120.00</td>
+<td>77.26</td>
+<td>2.5</td>
+<td>3042.74</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">W 8 I 13</th>
+<td>50'- 0</td>
+<td>A992</td>
+<td></td>
+<td>1</td>
+<td>650.00</td>
+<td>650.00</td>
+<td>17.74</td>
+<td>2.7</td>
+<td>632.26</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td>TOTALS:</td>
+<td></td>
+<td></td>
+<td>80130.00</td>
+<td>9743.93</td>
+<td>12.2</td>
+<td>70386.07</td>
+<td></td>
+</tr>
+</table>
+</div>
+<div class="table-container" data-page="2" data-left="0.0577" data-top="0.6272" data-width="0.7807" data-height="0.1015">
+<div class="table-page">Page 2</div>
+<div class="table-title">SUMMARY OF ALL STOCK WT SHAPES REQUIRED, INCLUDING NON-NESTABLE ITEMS:</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">STOCK ITEM</th>
+<th scope="col"></th>
+<th scope="col"></th>
+<th scope="col">CAMBER</th>
+<th scope="col"></th>
+<th scope="col">WT. ONE</th>
+<th scope="col">GROSS WT.</th>
+<th scope="col"></th>
+<th scope="col">%</th>
+<th scope="col">NET WT.</th>
+<th scope="col"></th>
+</tr>
+<tr>
+<th scope="row">DESCRIPTION</th>
+<td>LENGTH</td>
+<td>GRADE</td>
+<td>or M.O.</td>
+<td>QTY.</td>
+<td>STOCK</td>
+<td>WITH DROP</td>
+<td>DROP WT.</td>
+<td>DROP</td>
+<td>W/O DROP</td>
+<td>COMMENTS</td>
+</tr>
+<tr>
+<th scope="row">WT 6 I 25</th>
+<td>20 - 0</td>
+<td>A992</td>
+<td>or</td>
+<td>1</td>
+<td>500.00</td>
+<td>500.00</td>
+<td>452.86</td>
+<td>90.6</td>
+<td>47.14</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td>TOTALS:</td>
+<td></td>
+<td></td>
+<td>500.00</td>
+<td>452.86</td>
+<td>90.6</td>
+<td>47.14</td>
+<td></td>
+</tr>
+</table>
+</div>
+<div class="table-container" data-page="2" data-left="0.0573" data-top="0.7673" data-width="0.7805" data-height="0.1035">
+<div class="table-page">Page 2</div>
+<div class="table-title">SUMMARY OF ALL STOCK C SHAPES REQUIRED, INCLUDING NON-NESTABLE ITEMS:</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">STOCK ITEM</th>
+<th scope="col"></th>
+<th scope="col"></th>
+<th scope="col">CAMBER</th>
+<th scope="col"></th>
+<th scope="col">WT. ONE</th>
+<th scope="col">GROSS WT.</th>
+<th scope="col"></th>
+<th scope="col">%</th>
+<th scope="col">NET WT.</th>
+<th scope="col"></th>
+</tr>
+<tr>
+<th scope="row">DESCRIPTION</th>
+<td>LENGTH</td>
+<td>GRADE</td>
+<td>or M.O.</td>
+<td>QTY.</td>
+<td>STOCK</td>
+<td>WITH DROP</td>
+<td>DROP WT.</td>
+<td>DROP</td>
+<td>W/O DROP</td>
+<td>COMMENTS</td>
+</tr>
+<tr>
+<th scope="row">C 5 I 9</th>
+<td>20 - 0</td>
+<td>A36</td>
+<td></td>
+<td>2</td>
+<td>180.00</td>
+<td>360.00</td>
+<td>89.06</td>
+<td>24.7</td>
+<td>270.94</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td>TOTALS:</td>
+<td></td>
+<td></td>
+<td>360.00</td>
+<td>89.06</td>
+<td>24.7</td>
+<td>270.94</td>
+<td></td>
+</tr>
+</table>
+</div>
+</div>
+<div class="page" data-page="3">
+<div class="table-container" data-page="3" data-left="0.0581" data-top="0.2436" data-width="0.7792" data-height="0.1657">
+<div class="table-page">Page 3</div>
+<div class="table-title">SUMMARY OF ALL STOCK ANGLES REQUIRED, INCLUDING NON-NESTABLE ITEMS:</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">STOCK ITEM DESCRIPTION</th>
+<th scope="col">LENGTH</th>
+<th scope="col">GRADE</th>
+<th scope="col">CAMBER or M.O.</th>
+<th scope="col">QTY.</th>
+<th scope="col">WT. ONE STOCK</th>
+<th scope="col">GROSS WT. WITH DROP</th>
+<th scope="col">DROP WT.</th>
+<th scope="col">% DROP</th>
+<th scope="col">NET WT. W/O DROP</th>
+<th scope="col">COMMENTS</th>
+</tr>
+<tr>
+<th scope="row">L 6 x 4 3 3/8</th>
+<td>20 - 0</td>
+<td>A36</td>
+<td>or</td>
+<td>1</td>
+<td>246.00</td>
+<td>246.00</td>
+<td>131.20</td>
+<td>53.3</td>
+<td>114.80</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">L 6 x 4 x 5/16</th>
+<td>201-0</td>
+<td>A36</td>
+<td></td>
+<td>1</td>
+<td>206.00</td>
+<td>206.00</td>
+<td>111.91</td>
+<td>54.3</td>
+<td>94.09</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">L4x4x1/2</th>
+<td>201-0</td>
+<td>A36</td>
+<td></td>
+<td>1</td>
+<td>256.00</td>
+<td>256.00</td>
+<td>102.40</td>
+<td>40.0</td>
+<td>153.60</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">L4x4x3/8</th>
+<td>20'- 0</td>
+<td>A36</td>
+<td></td>
+<td>1</td>
+<td>196.00</td>
+<td>196.00</td>
+<td>184.16</td>
+<td>94.0</td>
+<td>11.84</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">L3r3x1/4</th>
+<td>20 - 0</td>
+<td>A36</td>
+<td></td>
+<td>1</td>
+<td>98.00</td>
+<td>98.00</td>
+<td>22.05</td>
+<td>22.5</td>
+<td>75.95</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td>TOTALS:</td>
+<td></td>
+<td></td>
+<td>1002.00</td>
+<td>551.72</td>
+<td>55.1</td>
+<td>450.28</td>
+<td></td>
+</tr>
+</table>
+</div>
+<div class="table-container" data-page="3" data-left="0.0581" data-top="0.4490" data-width="0.7799" data-height="0.1922">
+<div class="table-page">Page 3</div>
+<div class="table-title">SUMMARY OF ALL STOCK SQUARE/RECTANGULAR HSS REQUIRED, INCLUDING NON-NESTABLE ITEMS:</div>
+
+          <div class="table-controls">
+            <button class="toggle-view-btn" onclick="toggleTableView(this.parentNode.parentNode)" disabled>Upload PDF First</button>
+            <span class="view-status">Showing: HTML Table</span>
+          </div>
+          <div class="table-image-container" style="display:none;">
+            <img class="table-image" alt="Table image will appear here after PDF is loaded" />
+          </div>
+        
+<table>
+<tr>
+<th scope="col">STOCK ITEM DESCRIPTION</th>
+<th scope="col">LENGTH</th>
+<th scope="col">GRADE</th>
+<th scope="col">CAMBER or M.O.</th>
+<th scope="col">QTY.</th>
+<th scope="col">WT. ONE STOCK</th>
+<th scope="col">GROSS WT. WITH DROP</th>
+<th scope="col">DROP WT.</th>
+<th scope="col">% DROP</th>
+<th scope="col">NET WT. W/O DROP</th>
+<th scope="col">COMMENTS</th>
+</tr>
+<tr>
+<th scope="row">HSS 8 I 8 x 3/8</th>
+<td>20 - 0</td>
+<td>A500-GR.B-46</td>
+<td>or</td>
+<td>4</td>
+<td>753.80</td>
+<td>3015.20</td>
+<td>573.59</td>
+<td>19.0</td>
+<td>2441.61</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">HSS 8 I 8 I 5/16</th>
+<td>201-0</td>
+<td>A500-GR.B-46</td>
+<td></td>
+<td>2</td>
+<td>636.80</td>
+<td>1273.60</td>
+<td>95.19</td>
+<td>7.5</td>
+<td>1178.41</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">HSS 8 I 8 I 1/4</th>
+<td>20 - 0</td>
+<td>A500-GR.B-46</td>
+<td></td>
+<td>2</td>
+<td>516.40</td>
+<td>1032.80</td>
+<td>265.73</td>
+<td>25.7</td>
+<td>767.07</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">HSS 8 8 x 8 x 1/4</th>
+<td>201-0</td>
+<td>A500-GR.B-46</td>
+<td></td>
+<td>1</td>
+<td>619.68</td>
+<td>619.68</td>
+<td>43.03</td>
+<td>6.9</td>
+<td>576.65</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">HSS 4 x 4 1 1/4</th>
+<td>20'- 0</td>
+<td>A500-GR.B-46</td>
+<td></td>
+<td>7</td>
+<td>244.20</td>
+<td>1709.40</td>
+<td>211.39</td>
+<td>12.4</td>
+<td>1498.01</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<th scope="row">HSS 3 x 3 x 1/4</th>
+<td>20'- 0</td>
+<td>A500-GR.B-46</td>
+<td></td>
+<td>1</td>
+<td>176.20</td>
+<td>176.20</td>
+<td>174.73</td>
+<td>99.2</td>
+<td>1.47</td>
+<td>SOURCE: SUPPLIER STOCK</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td>TOTALS:</td>
+<td></td>
+<td></td>
+<td>10442.44</td>
+<td>1658.62</td>
+<td>15.9</td>
+<td>8783.82</td>
+<td></td>
+</tr>
+</table>
+</div>
+</div>
+  <footer>
+    <p class="source-info">Source: sample-text-ocr</p>
+    <p class="generation-info">Generated on 5/11/2025, 4:28:26 PM</p>
+  </footer>
+  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<script>
+  // Set PDF.js worker path
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+  // Store the PDF data and loaded state
+  let pdfData = null;
+  let pdfLoaded = false;
+
+  // Function to load the PDF file and extract all table images
+  async function loadPdfFile() {
+    const fileInput = document.getElementById('pdf-file-input');
+    const statusElement = document.getElementById('pdf-status');
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+      statusElement.textContent = 'Please select a PDF file first';
+      statusElement.style.color = 'red';
+      return;
+    }
+
+    const file = fileInput.files[0];
+    if (file.type !== 'application/pdf') {
+      statusElement.textContent = 'Please select a valid PDF file';
+      statusElement.style.color = 'red';
+      return;
+    }
+
+    statusElement.textContent = 'Loading PDF...';
+    statusElement.style.color = 'blue';
+
+    try {
+      // Read the file as ArrayBuffer
+      const arrayBuffer = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
+
+      // Store the PDF data
+      pdfData = new Uint8Array(arrayBuffer);
+
+      // Update status
+      statusElement.textContent = 'PDF loaded. Extracting table images...';
+
+      // Get all table containers
+      const tableContainers = document.querySelectorAll('.table-container');
+
+      // Process each table container
+      for (let i = 0; i < tableContainers.length; i++) {
+        const container = tableContainers[i];
+        statusElement.textContent = 'Extracting table ' + (i+1) + ' of ' + tableContainers.length + '...';
+
+        // Extract the image for this table
+        await extractTableImage(container, false);
+
+        // Update the button text and enable it
+        const button = container.querySelector('.toggle-view-btn');
+        button.textContent = 'Show Image View';
+        button.disabled = false;
+      }
+
+      // Mark PDF as loaded
+      pdfLoaded = true;
+
+      // Update status
+      statusElement.textContent = 'PDF loaded successfully! Extracted ' + tableContainers.length + ' table images.';
+      statusElement.style.color = 'green';
+    } catch (error) {
+      console.error('Error loading PDF:', error);
+      statusElement.textContent = 'Error loading PDF: ' + error.message;
+      statusElement.style.color = 'red';
+    }
+  }
+
+  // Function to toggle between HTML table and image view
+  function toggleTableView(tableContainer) {
+    if (!pdfLoaded) {
+      alert('Please load a PDF file first');
+      return;
+    }
+
+    const tableElement = tableContainer.querySelector('table');
+    const imageContainer = tableContainer.querySelector('.table-image-container');
+    const button = tableContainer.querySelector('.toggle-view-btn');
+    const statusText = tableContainer.querySelector('.view-status');
+
+    if (tableElement.style.display !== 'none') {
+      // Switch to image view
+      tableElement.style.display = 'none';
+      imageContainer.style.display = 'block';
+      button.textContent = 'Show HTML Table';
+      statusText.textContent = 'Showing: Image View';
+    } else {
+      // Switch to HTML table view
+      tableElement.style.display = '';
+      imageContainer.style.display = 'none';
+      button.textContent = 'Show Image View';
+      statusText.textContent = 'Showing: HTML Table';
+    }
+  }
+
+  // Function to extract table as image
+  async function extractTableImage(tableContainer, download = false) {
+    try {
+      // Get table coordinates from data attributes
+      const page = parseInt(tableContainer.getAttribute('data-page'));
+      const left = parseFloat(tableContainer.getAttribute('data-left'));
+      const top = parseFloat(tableContainer.getAttribute('data-top'));
+      const width = parseFloat(tableContainer.getAttribute('data-width'));
+      const height = parseFloat(tableContainer.getAttribute('data-height'));
+
+      if (!page || isNaN(left) || isNaN(top) || isNaN(width) || isNaN(height)) {
+        alert('Missing coordinate data for this table');
+        return;
+      }
+
+      // Check if PDF data is available
+      if (!pdfData) {
+        alert('Please load a PDF file first using the button at the top of the page');
+        return;
+      }
+
+      // Get the button and image elements
+      const button = tableContainer.querySelector('.toggle-view-btn');
+      const imageElement = tableContainer.querySelector('.table-image');
+
+      // Load the PDF
+      const loadingTask = pdfjsLib.getDocument(pdfData);
+      const pdf = await loadingTask.promise;
+
+      // Get the specific page
+      const pdfPage = await pdf.getPage(page);
+
+      // Get the viewport at a higher scale for better quality
+      const scale = 2.0;
+      const viewport = pdfPage.getViewport({ scale });
+
+      // Calculate the dimensions in pixels
+      const pixelLeft = left * viewport.width;
+      const pixelTop = top * viewport.height;
+      const pixelWidth = width * viewport.width;
+      const pixelHeight = height * viewport.height;
+
+      // Create a canvas element
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+
+      // Set canvas dimensions to match the table
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+
+      // Set up rendering parameters
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport,
+        transform: [1, 0, 0, 1, -pixelLeft, -pixelTop]
+      };
+
+      // Render the page to the canvas
+      await pdfPage.render(renderContext).promise;
+
+      // Convert canvas to image
+      const imageDataUrl = canvas.toDataURL('image/png');
+
+      // Set the image source
+      imageElement.src = imageDataUrl;
+
+      // If download is requested, trigger download
+      if (download) {
+        const link = document.createElement('a');
+        link.href = imageDataUrl;
+        link.download = 'table_page' + page + '_' + left.toFixed(2) + '_' + top.toFixed(2) + '.png';
+        link.click();
+      }
+
+      return imageDataUrl;
+    } catch (error) {
+      console.error('Error extracting table:', error);
+      if (download) {
+        alert('Error extracting table: ' + error.message);
+      }
+      return null;
+    }
+  }
+</script>
+
+</body>
+</html>
