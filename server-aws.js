@@ -397,6 +397,10 @@ app.post('/process-pdf', async (req, res) => {
       .json({ error: 'Missing S3 URL parameter in request body' });
   }
 
+  app.post('/echo', (req, res) => {
+    res.status(200).json(req.body);
+  });
+
   // Log the received S3 URL
   console.log('Received S3 URL:', s3Url);
 
