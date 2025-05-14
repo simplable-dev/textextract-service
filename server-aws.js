@@ -25,7 +25,7 @@ const requiredEnvVars = [
   'S3_BUCKET_NAME'
 ];
 
-console.log('ENV debug:', {
+console.warn('ENV debug:', {
   SNS_TOPIC_ARN: process.env.SNS_TOPIC_ARN,
   SNS_ROLE_ARN: process.env.SNS_ROLE_ARN,
   S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
